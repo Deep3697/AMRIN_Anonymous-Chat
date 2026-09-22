@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 const attachmentSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ["image", "video", "audio"], required: true },

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema(
   {
@@ -25,5 +26,12 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+//It only do rehashing when only password changes not any other fields
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("passwordHash")) return next();
+  this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+  next();
+});
 
 export const User = mongoose.model("User", userSchema);

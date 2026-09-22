@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 const batchSchema = new mongoose.Schema(
   {
     label: { type: String, required: true, unique: true, uppercase: true, trim: true }, // "24BCE"
