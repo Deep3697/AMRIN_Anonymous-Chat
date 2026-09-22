@@ -1,0 +1,29 @@
+import mongoose from "mongoose";
+
+const userSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    anonymousName: { type: String, required: true, unique: true, trim: true },
+    gender: { type: String, enum: ["male", "female", "other"], required: true },
+
+    // Cohort — all null until an admin manually assigns them (see Batch/Group below)
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: "Batch", default: null },
+    batchLabel: { type: String, default: null }, // cached copy of Batch.label, avoids a populate for display
+    branch: { type: String, default: null },
+    institute: { type: String, default: null },
+    division: { type: String, default: null },   // set only once the second admin step happens
+
+    role: {
+      type: String,
+      enum: ["member", "chat_monitor", "main_admin", "god_admin"],
+      default: "member",
+    },
+    status: { type: String, enum: ["active", "muted", "blocked"], default: "active" },
+    mutedUntil: { type: Date, default: null },
+    offenceCount: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+export const User = mongoose.model("User", userSchema);
