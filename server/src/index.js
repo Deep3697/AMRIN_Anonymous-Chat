@@ -1,18 +1,29 @@
 import dns from "node:dns";
 dns.setServers(["8.8.8.8", "1.1.1.1"]); // Force Node to use Google/Cloudflare DNS
 
-import 'dotenv/config'; // Must be loaded before app.js so process.env is ready
-import connectDB from "./db/index.js"; 
+import "dotenv/config";
+import http from "http";
+import { Server } from "socket.io";
 import { app } from "./app.js";
+import connectDB from "./db/index.js";
+import { initSocket } from "./sockets/index.js";
 
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
+const httpServer = http.createServer(app);
 
-// Connect to the database first
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true,
+  },
+});
+initSocket(io);
+
+// Connect to the database first, then start the server
 connectDB()
   .then(() => {
-    // Only start the server if the DB connection is successful
-    app.listen(port, () => {
-      console.log(`Server is running at http://localhost:${port}`);
+    httpServer.listen(PORT, () => {
+      console.log(`Server is running at http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
