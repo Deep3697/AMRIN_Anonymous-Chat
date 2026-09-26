@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { Otp } from "../models/otp.model.js";
+import { transporter } from "../config/mail.js";
 
 export async function generateOtp(email, purpose = "register") {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -12,7 +13,13 @@ export async function generateOtp(email, purpose = "register") {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  console.log(`[DEV] OTP for ${email}: ${code}`); // replaced with real email in Phase 7
+  await transporter.sendMail({
+    from: process.env.MAIL_USER,
+    to: email,
+    subject: "Your verification code",
+    text: `Your OTP is ${code}. It expires in 10 minutes.`,
+  });
+
   return true;
 }
 
@@ -28,6 +35,5 @@ export async function verifyOtp(email, code, purpose = "register") {
     await record.save();
     return { valid: false, reason: "Incorrect code" };
   }
-
   return { valid: true };
 }

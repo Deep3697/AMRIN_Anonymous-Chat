@@ -7,7 +7,8 @@ import PublicRoute from "./routes/PublicRoute";
 import HeroPage from "./components/hero/HeroPage";
 import LoginForm from "./components/auth/LoginForm";
 import RegisterForm from "./components/auth/RegisterForm";
-import ChatWindow from "./components/chat/ChatWindow";
+import ChatPage from "./pages/ChatPage";
+
 
 export default function App() {
   const { setUser, clearUser } = useAuthStore();
@@ -22,7 +23,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<PublicRoute><HeroPage /></PublicRoute>} />
-        <Route path="/chat" element={<PrivateRoute><ChatWindow /></PrivateRoute>} />
+        <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/login" element={<PublicRoute><LoginForm /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterForm /></PublicRoute>} />
       </Routes>
