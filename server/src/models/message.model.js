@@ -22,8 +22,11 @@ const messageSchema = new mongoose.Schema(
     attachment: { type: attachmentSchema, default: null },
     type: { type: String, enum: ["user", "system"], default: "user" },
     isDeleted: { type: Boolean, default: false },
-  },
-  { timestamps: true }
+    embedding: { type: [Number], default: [] },
+    meta: {
+      deadline: { type: Date, default: null },
+    },
+  }, { timestamps: true }
 );
 
 messageSchema.index({ threadId: 1, createdAt: -1 });
