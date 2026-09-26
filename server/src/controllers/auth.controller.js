@@ -1,4 +1,6 @@
 import { User } from "../models/user.model.js";
+import { Group } from "../models/group.model.js";
+import { Membership } from "../models/membership.model.js";
 import { generateOtp, verifyOtp } from "../services/otp.service.js";
 import { issueSession } from "../services/auth.service.js";
 import jwt from "jsonwebtoken";
@@ -82,6 +84,18 @@ export async function completeProfile(req, res) {
       anonymousName,
       gender,
     });
+
+    // Auto-join the universal casual group
+    let universalGroup = await Group.findOne({ level: "universal" });
+    if (!universalGroup) {
+      universalGroup = await Group.create({
+        name: "University-Casual",
+        type: "casual",
+        level: "universal",
+        isDefault: true,
+      });
+    }
+    await Membership.create({ userId: user._id, groupId: universalGroup._id }).catch(() => {});
 
     issueSession(res, user);
 
