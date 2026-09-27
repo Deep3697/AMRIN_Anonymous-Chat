@@ -196,4 +196,45 @@ export function registerMessageHandlers(io, socket) {
     await User.findByIdAndUpdate(userId, { role: "member" });
     socket.emit("user:actionSuccess", { action: "demoted", userId });
   });
+
+  // ── Create a poll ──
+  socket.on("poll:create", async ({ threadId, threadType, question, options }) => {
+    try {
+      const user = await User.findById(socket.user.sub);
+      const message = await Message.create({
+        threadId,
+        threadType,
+        senderId: user._id,
+        anonymousNameSnapshot: user.anonymousName,
+        type: "poll",
+        poll: { question, options: options.map((text) => ({ text, votes: [] })) },
+      });
+      io.to(threadId).emit("message:new", message);
+    } catch {
+      socket.emit("message:error", { error: "Failed to create poll" });
+    }
+  });
+
+  // ── Vote on a poll (click again to remove your vote) ──
+  socket.on("poll:vote", async ({ messageId, optionIndex }) => {
+    const message = await Message.findById(messageId);
+    if (!message || message.type !== "poll") return;
+
+    const userId = socket.user.sub;
+    if (!message.poll.allowMultiple) {
+      message.poll.options.forEach((opt) => {
+        opt.votes = opt.votes.filter((v) => v.toString() !== userId);
+      });
+    }
+    const option = message.poll.options[optionIndex];
+    const alreadyVoted = option.votes.some((v) => v.toString() === userId);
+    option.votes = alreadyVoted
+      ? option.votes.filter((v) => v.toString() !== userId)
+      : [...option.votes, userId];
+
+    await message.save();
+    io.to(message.threadId.toString()).emit("message:updated", message);
+  });
+
+
 }

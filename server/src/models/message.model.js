@@ -2,10 +2,11 @@ import mongoose from "mongoose";
 
 const attachmentSchema = new mongoose.Schema(
   {
-    type: { type: String, enum: ["image", "video", "audio"], required: true },
+    type: { type: String, enum: ["image", "video", "audio","file"], required: true },
     url: { type: String, required: true },
     publicId: { type: String },
     caption: { type: String, trim: true },
+    fileName: { type: String, default: null },
     sizeBytes: { type: Number },
     durationSeconds: { type: Number },
   },
@@ -20,7 +21,16 @@ const messageSchema = new mongoose.Schema(
     anonymousNameSnapshot: { type: String, required: true },
     text: { type: String, trim: true }, // optional — a message can be media-only
     attachment: { type: attachmentSchema, default: null },
-    type: { type: String, enum: ["user", "system"], default: "user" },
+    type: { type: String, enum: ["user", "system", "poll"], default: "user" },
+    poll: {
+      question: { type: String },
+      options: [{
+        text: String,
+        votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        _id: false,
+      }],
+      allowMultiple: { type: Boolean, default: false },
+    },
     isDeleted: { type: Boolean, default: false },
     deletedBySnapshot: { type: String, default: null },
     isEdited: { type: Boolean, default: false },

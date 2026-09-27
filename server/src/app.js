@@ -9,6 +9,7 @@ import conversationRoutes from "./routes/conversation.routes.js";
 import monitorRoutes from "./routes/monitor.routes.js";
 import helpRoutes from "./routes/help.routes.js";
 import reportRoutes from "./routes/report.routes.js";
+import canteenRoutes from "./routes/canteen.routes.js";
 
 
 const app = express();
@@ -38,6 +39,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/monitor", monitorRoutes);
 app.use("/api/help", helpRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/canteen", canteenRoutes);
 
 // We export the app to be imported in index.js
 export { app };
