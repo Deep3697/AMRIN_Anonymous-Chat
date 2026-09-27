@@ -37,8 +37,14 @@ export async function reviewActionRequest(req, res) {
   if (decision === "approved") {
     if (request.action === "add_member") {
       await Membership.create({ userId: request.targetUserId, groupId: request.groupId }).catch(() => {});
-    } else {
+    } else if (request.action === "remove_member" || request.action === "kick_member") {
       await Membership.deleteOne({ userId: request.targetUserId, groupId: request.groupId });
+    } else if (request.action === "mute_user") {
+      const minutes = req.body.muteDuration || 60;
+      await User.findByIdAndUpdate(request.targetUserId, {
+        status: "muted",
+        mutedUntil: new Date(Date.now() + minutes * 60 * 1000),
+      });
     }
   }
 

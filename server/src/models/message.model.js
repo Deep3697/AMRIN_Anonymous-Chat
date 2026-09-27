@@ -22,6 +22,10 @@ const messageSchema = new mongoose.Schema(
     attachment: { type: attachmentSchema, default: null },
     type: { type: String, enum: ["user", "system"], default: "user" },
     isDeleted: { type: Boolean, default: false },
+    deletedBySnapshot: { type: String, default: null },
+    isEdited: { type: Boolean, default: false },
+    editedAt: { type: Date, default: null },
+    seenBy: [{ userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, seenAt: { type: Date, default: Date.now }, _id: false }],
     embedding: { type: [Number], default: [] },
     meta: {
       deadline: { type: Date, default: null },

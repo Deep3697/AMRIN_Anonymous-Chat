@@ -20,6 +20,9 @@ const userSchema = new mongoose.Schema(
       enum: ["member", "chat_monitor", "main_admin", "god_admin"],
       default: "member",
     },
+    suspendedRole: { type: String, default: null },
+    roleSuspendedUntil: { type: Date, default: null },
+    
     status: { type: String, enum: ["active", "muted", "blocked"], default: "active" },
     mutedUntil: { type: Date, default: null },
     offenceCount: { type: Number, default: 0 },

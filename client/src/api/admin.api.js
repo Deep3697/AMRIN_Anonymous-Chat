@@ -36,5 +36,15 @@ export const fetchDistinctBranches = (batchId, institute) =>
 
 // ─── Monitor ────────────────────────────────────────────────────────
 export const fetchPendingRequests = () => axiosClient.get("/monitor/requests");
-export const reviewRequest = (requestId, decision) =>
-  axiosClient.post("/monitor/requests/review", { requestId, decision });
+export const reviewRequest = (requestId, decision, muteDuration) =>
+  axiosClient.post("/monitor/requests/review", { requestId, decision, muteDuration });
+export const assignMonitor = (userId, groupId) =>
+  axiosClient.post("/monitor/assign", { userId, groupId });
+
+// ─── User Reports ───────────────────────────────────────────────────
+export const submitReport = (reportedUser, groupId, reason) =>
+  axiosClient.post("/reports", { reportedUser, groupId, reason });
+export const fetchReports = (filter) =>
+  axiosClient.get("/reports", { params: filter ? { filter } : {} });
+export const reviewReport = (reportId, action, muteDuration) =>
+  axiosClient.post("/reports/review", { reportId, action, muteDuration });

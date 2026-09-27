@@ -6,6 +6,7 @@ import AssignInstitutePanel from "../components/admin/AssignInstitutePanel";
 import AssignBranchPanel from "../components/admin/AssignBranchPanel";
 import AssignDivisionPanel from "../components/admin/AssignDivisionPanel";
 import PendingRequestsQueue from "../components/admin/PendingRequestsQueue";
+import ReportsQueue from "../components/admin/ReportsQueue";
 import { useAuthStore } from "../store/authStore";
 import { logoutUser } from "../api/auth.api";
 
@@ -71,6 +72,10 @@ export default function AdminPage() {
 
       {/* Monitor Requests */}
       <PendingRequestsQueue />
+      <hr style={{ margin: "20px 0" }} />
+
+      {/* User Reports */}
+      <ReportsQueue />
     </div>
   );
 }
