@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ status: 1, mutedUntil: 1 }); // speeds up listMutedUsers and every mute-check on message send
 //It only do rehashing when only password changes not any other fields
 userSchema.pre("save", async function () {
   if (!this.isModified("passwordHash")) return;

@@ -17,4 +17,6 @@ const helpThreadSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+helpThreadSchema.index({ status: 1 });
+
 export const HelpThread = mongoose.model("HelpThread", helpThreadSchema);

@@ -96,20 +96,7 @@ export async function listBannedUsers(req, res) {
       .sort({ createdAt: -1 });
 
     // Filter out expired bans and auto-restore them
-    const activeBans = [];
-    for (const ban of bans) {
-      if (ban.expiresAt && ban.expiresAt <= new Date()) {
-        ban.isActive = false;
-        await ban.save();
-        if (ban.userId) {
-          await User.findByIdAndUpdate(ban.userId._id, { status: "active", bannedUntil: null });
-        }
-      } else {
-        activeBans.push(ban);
-      }
-    }
-
-    return res.status(200).json({ bans: activeBans });
+    return res.status(200).json({ bans });
   } catch {
     return res.status(500).json({ error: "Something went wrong" });
   }

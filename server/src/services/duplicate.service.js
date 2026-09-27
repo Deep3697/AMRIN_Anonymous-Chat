@@ -21,7 +21,10 @@ export async function isDuplicate(threadId, embedding, threshold = 0.87) {
     threadId,
     embedding: { $exists: true, $ne: [] },
     createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-  }).select("embedding");
+  })
+    .select("embedding")
+    .sort({ createdAt: -1 })
+    .limit(200); // bounds the comparison cost regardless of how large the group's history grows
 
   return recentMessages.some((m) => cosineSimilarity(embedding, m.embedding) >= threshold);
 }

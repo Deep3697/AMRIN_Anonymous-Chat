@@ -8,6 +8,7 @@ import { app } from "./app.js";
 import connectDB from "./db/index.js";
 import { initSocket } from "./sockets/index.js";
 import { startSlotRollupJob } from "./jobs/slotRollup.job.js";
+import { startBanExpiryJob } from "./jobs/banExpiry.job.js";
 
 const PORT = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
@@ -27,6 +28,7 @@ connectDB()
       console.log(`Server is running at http://localhost:${PORT}`);
     });
     startSlotRollupJob();
+    startBanExpiryJob()
   })
   .catch((err) => {
     console.log("MongoDB connection failed !!! ", err);
