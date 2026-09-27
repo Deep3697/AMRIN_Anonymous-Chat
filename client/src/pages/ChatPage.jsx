@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/authStore";
 import { logoutUser } from "../api/auth.api";
 import { searchUsersByName, startConversation } from "../api/conversation.api";
 import { useChatStore } from "../store/chatStore";
+import socket from "../socket/socketClient";
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -23,6 +24,13 @@ export default function ChatPage() {
 
   // Check if user is banned
   const isBanned = user?.status === "banned" || (user?.bannedUntil && new Date(user.bannedUntil) > new Date());
+
+  useEffect(() => {
+    if (!isBanned) {
+      socket.connect();
+    }
+    return () => socket.disconnect();
+  }, [isBanned]);
 
   // Debounced search
   useEffect(() => {

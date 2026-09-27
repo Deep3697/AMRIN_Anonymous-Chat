@@ -42,24 +42,22 @@ export default function ChatWindow() {
       axiosClient.patch(`/groups/${activeGroupId}/read`).catch(() => {});
     }
 
-    socket.connect();
     socket.emit("group:join", activeGroupId);
     
-    socket.on("message:new", (m) => {
+    const handleNew = (m) => {
       setMessages((prev) => {
-        // If it has a tempId, it means we sent it. Replace the temporary optimistic message!
         if (m.tempId && prev.some((x) => x._id === m.tempId)) {
           return prev.map((x) => (x._id === m.tempId ? m : x));
         }
         return [...prev, m];
       });
-    });
+    };
 
-    socket.on("message:updated", (updated) => {
+    const handleUpdate = (updated) => {
       setMessages((prev) => prev.map((m) => (m._id === updated._id ? updated : m)));
-    });
+    };
 
-    socket.on("message:seenUpdate", ({ messageId, seenCount }) => {
+    const handleSeenUpdate = ({ messageId, seenCount }) => {
       setMessages((prev) =>
         prev.map((m) => {
           if (m._id === messageId) {
@@ -68,22 +66,25 @@ export default function ChatWindow() {
           return m;
         })
       );
-    });
+    };
 
-    socket.on("message:error", (err) => {
+    const handleError = (err) => {
       alert("Error: " + err.error);
       if (err.tempId) {
-        // Remove the optimistic message because it failed moderation or duplication checks
         setMessages((prev) => prev.filter((m) => m._id !== err.tempId));
       }
-    });
+    };
+
+    socket.on("message:new", handleNew);
+    socket.on("message:updated", handleUpdate);
+    socket.on("message:seenUpdate", handleSeenUpdate);
+    socket.on("message:error", handleError);
 
     return () => {
-      socket.off("message:new");
-      socket.off("message:updated");
-      socket.off("message:seenUpdate");
-      socket.off("message:error");
-      socket.disconnect();
+      socket.off("message:new", handleNew);
+      socket.off("message:updated", handleUpdate);
+      socket.off("message:seenUpdate", handleSeenUpdate);
+      socket.off("message:error", handleError);
     };
   }, [activeGroupId, activeThreadType]);
 
@@ -105,7 +106,7 @@ export default function ChatWindow() {
       _id: tempId,
       text: currentText,
       anonymousNameSnapshot: user?.anonymousName || "Me",
-      senderId: user?._id || user?.sub,
+      senderId: user?.id || user?._id || user?.sub,
       type: "user",
       isOptimistic: true,
       createdAt: new Date().toISOString(),
@@ -179,7 +180,7 @@ export default function ChatWindow() {
       {/* Message List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
         {messages.map((m) => {
-          const isOwn = String(m.senderId) === String(user?._id) || String(m.senderId) === String(user?.sub) || m.anonymousNameSnapshot === user?.anonymousName;
+          const isOwn = String(m.senderId) === String(user?.id || user?._id || user?.sub) || m.anonymousNameSnapshot === user?.anonymousName;
           return (
             <div key={m._id} style={{ marginBottom: "12px", position: "relative" }}>
               <OpportunityCard message={m} isOwnMessage={isOwn} userRole={user?.role || "member"} threadType={activeThreadType} />

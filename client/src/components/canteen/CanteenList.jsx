@@ -18,8 +18,18 @@ export default function CanteenList({ onClose }) {
     <div>
       <h2>Canteen Status</h2>
       {canteens.map((c) => (
-        <div key={c._id} onClick={() => setSelected(c)} style={{ cursor: "pointer", border: "1px solid #ccc", padding: "8px" }}>
-          <strong>{c.name}</strong>
+        <div 
+          key={c._id} 
+          onClick={() => !c.hasVoted && setSelected(c)} 
+          style={{ 
+            cursor: c.hasVoted ? "not-allowed" : "pointer", 
+            border: "1px solid #ccc", 
+            padding: "8px",
+            opacity: c.hasVoted ? 0.6 : 1,
+            backgroundColor: c.hasVoted ? "#f9f9f9" : "white"
+          }}
+        >
+          <strong>{c.name}</strong> {c.hasVoted && <span style={{ color: "green", fontSize: "0.8em" }}> (You voted this hour)</span>}
           <p>Now: {LEVEL_LABELS[c.currentLevel]} ({c.currentVoteCount} votes)</p>
           <p>Last hour: {LEVEL_LABELS[c.previousLevel]}</p>
         </div>

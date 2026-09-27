@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Membership } from "../models/membership.model.js";
 import { Group } from "../models/group.model.js";
 
@@ -6,7 +7,27 @@ export async function getMyGroups(req, res) {
     let groups;
     if (["god_admin", "main_admin"].includes(req.user.role)) {
       // Admins see all groups across the platform
-      groups = await Group.find().sort({ lastMessageAt: -1, createdAt: -1 });
+      const allGroups = await Group.find().sort({ lastMessageAt: -1, createdAt: -1 });
+      
+      const adminMemberships = await Membership.find({ userId: req.user.sub });
+      const membershipMap = new Map(adminMemberships.map(m => [m.groupId.toString(), m]));
+
+      const groupsWithUnread = await Promise.all(allGroups.map(async (g) => {
+        const mem = membershipMap.get(g._id.toString());
+        
+        const unreadCount = await mongoose.model("Message").countDocuments({
+          threadId: g._id,
+          createdAt: { $gt: mem?.lastReadAt || new Date(0) },
+          senderId: { $ne: req.user.sub }
+        });
+
+        return {
+          ...g.toObject(),
+          unreadCount
+        };
+      }));
+      
+      groups = groupsWithUnread;
     } else {
       // Auto-sync: Ensure the user is a member of ALL universal groups.
       // This catches older users who registered before a universal group was created.
@@ -22,8 +43,24 @@ export async function getMyGroups(req, res) {
 
       // Regular members only see groups they have membership for
       const memberships = await Membership.find({ userId: req.user.sub }).populate("groupId");
-      groups = memberships
-        .map((m) => m.groupId)
+      
+      const groupsWithUnread = await Promise.all(memberships.map(async (m) => {
+        if (!m.groupId) return null;
+        
+        // Count unread messages
+        const unreadCount = await mongoose.model("Message").countDocuments({
+          threadId: m.groupId._id,
+          createdAt: { $gt: m.lastReadAt || new Date(0) },
+          senderId: { $ne: req.user.sub } // optional: don't count own messages
+        });
+
+        return {
+          ...m.groupId.toObject(),
+          unreadCount
+        };
+      }));
+
+      groups = groupsWithUnread
         .filter(Boolean)
         .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
     }
@@ -36,7 +73,8 @@ export async function getMyGroups(req, res) {
 export async function markAsRead(req, res) {
   await Membership.updateOne(
     { userId: req.user.sub, groupId: req.params.groupId },
-    { lastReadAt: new Date() }
+    { lastReadAt: new Date() },
+    { upsert: true }
   );
   return res.status(200).json({ message: "Marked read" });
 }

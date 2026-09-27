@@ -3,9 +3,21 @@ import { CrowdVote } from "../models/crowdVote.model.js";
 import { CrowdSlot } from "../models/crowdSlot.model.js";
 import { getCurrentSlotStart, getPreviousSlotStart } from "../utils/timeSlots.js";
 
-function computeAverageLevel(votes) {
-  if (votes.length < 3) return null;
-  return Math.round(votes.reduce((sum, v) => sum + v.level, 0) / votes.length);
+function computeMajorityLevel(votes) {
+  if (votes.length < 1) return null;
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  for (const v of votes) {
+    counts[v.level] = (counts[v.level] || 0) + 1;
+  }
+  let maxCount = 0;
+  let winner = null;
+  for (const level of [1, 2, 3]) {
+    if (counts[level] >= maxCount && counts[level] > 0) {
+      maxCount = counts[level];
+      winner = level;
+    }
+  }
+  return winner;
 }
 
 export async function listCanteens(req, res) {
@@ -17,11 +29,13 @@ export async function listCanteens(req, res) {
     const results = await Promise.all(canteens.map(async (canteen) => {
       const currentVotes = await CrowdVote.find({ canteenId: canteen._id, slotStart: currentSlot });
       const previousSlotData = await CrowdSlot.findOne({ canteenId: canteen._id, slotStart: previousSlot });
+      const hasVoted = currentVotes.some(v => String(v.userId) === String(req.user.sub));
       return {
         _id: canteen._id, name: canteen.name, location: canteen.location,
-        currentLevel: computeAverageLevel(currentVotes),
+        currentLevel: computeMajorityLevel(currentVotes),
         currentVoteCount: currentVotes.length,
         previousLevel: previousSlotData?.finalLevel || null,
+        hasVoted
       };
     }));
 

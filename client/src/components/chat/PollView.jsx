@@ -3,7 +3,7 @@ import { useAuthStore } from "../../store/authStore";
 
 export default function PollView({ message }) {
   const user = useAuthStore((s) => s.user);
-  const myId = user?._id || user?.sub;
+  const myId = user?.id || user?._id || user?.sub;
   const totalVotes = message.poll.options.reduce((sum, o) => sum + o.votes.length, 0);
 
   function vote(optionIndex) {

@@ -10,6 +10,8 @@ import ReportsQueue from "../components/admin/ReportsQueue";
 import BanPanel from "../components/admin/BanPanel";
 import BanAppealsPanel from "../components/admin/BanAppealsPanel";
 import MutePanel from "../components/admin/MutePanel";
+import CreateCanteenPanel from "../components/admin/CreateCanteenPanel";
+import HelpQueuePanel from "../components/admin/HelpQueuePanel";
 import { useAuthStore } from "../store/authStore";
 import { logoutUser } from "../api/auth.api";
 
@@ -83,6 +85,10 @@ export default function AdminPage() {
       <ReportsQueue />
       <hr style={{ margin: "20px 0" }} />
 
+      {/* Help Requests */}
+      <HelpQueuePanel />
+      <hr style={{ margin: "20px 0" }} />
+
       {/* Mute Management */}
       <MutePanel />
       <hr style={{ margin: "20px 0" }} />
@@ -95,6 +101,8 @@ export default function AdminPage() {
       {isGodAdmin && (
         <>
           <BanAppealsPanel />
+          <hr style={{ margin: "20px 0" }} />
+          <CreateCanteenPanel />
           <hr style={{ margin: "20px 0" }} />
         </>
       )}

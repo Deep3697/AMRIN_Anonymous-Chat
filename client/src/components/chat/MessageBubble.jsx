@@ -228,7 +228,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
         ? <span style={{ fontSize: "0.75em", color: "#28a745" }}>✓✓ Seen</span>
         : <span style={{ fontSize: "0.75em", color: "#999" }}>✓ Not Seen</span>;
     }
-    return <span style={{ fontSize: "0.75em", color: "#888" }}>👁️ Seen by {message.seenBy?.length || 0}</span>;
+    return null; // Group chat read receipts are only shown in the options menu
   }
 
   return (

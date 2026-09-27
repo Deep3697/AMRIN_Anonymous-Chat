@@ -11,10 +11,22 @@ export function startSlotRollupJob() {
     for (const canteen of canteens) {
       const votes = await CrowdVote.find({ canteenId: canteen._id, slotStart });
       if (votes.length === 0) continue;
-      const avg = Math.round(votes.reduce((sum, v) => sum + v.level, 0) / votes.length);
+      const counts = { 1: 0, 2: 0, 3: 0 };
+      for (const v of votes) {
+        counts[v.level] = (counts[v.level] || 0) + 1;
+      }
+      let maxCount = 0;
+      let winner = null;
+      for (const level of [1, 2, 3]) {
+        if (counts[level] >= maxCount && counts[level] > 0) {
+          maxCount = counts[level];
+          winner = level;
+        }
+      }
+      
       await CrowdSlot.findOneAndUpdate(
         { canteenId: canteen._id, slotStart },
-        { finalLevel: avg, totalVotes: votes.length },
+        { finalLevel: winner, totalVotes: votes.length },
         { upsert: true }
       );
     }
