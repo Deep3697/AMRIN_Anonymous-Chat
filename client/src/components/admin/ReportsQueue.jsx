@@ -78,26 +78,26 @@ export default function ReportsQueue() {
             <div
               key={r._id}
               style={{
-                border: filter === "admin" ? "1px solid #dc3545" : "1px solid #ffc107",
-                borderRadius: "6px",
-                padding: "12px",
-                marginBottom: "10px",
-                backgroundColor: filter === "admin" ? "#fff5f5" : "#fffdf5",
+                border: filter === "admin" ? "1px solid #ef4444" : "1px solid #f59e0b",
+                borderRadius: "8px",
+                padding: "14px",
+                marginBottom: "12px",
+                backgroundColor: filter === "admin" ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)",
               }}
             >
-              <p style={{ margin: "0 0 6px" }}>
+              <p style={{ margin: "0 0 6px", color: "#f3f4f6" }}>
                 <strong>{r.reportedBy?.anonymousName}</strong> reported{" "}
-                <strong style={{ color: "#dc3545" }}>
+                <strong style={{ color: "#ef4444" }}>
                   {r.reportedUser?.anonymousName}
                   {r.reportedUser?.role && ["main_admin", "god_admin"].includes(r.reportedUser.role) && (
-                    <span style={{ fontSize: "0.8em", color: "#856404", marginLeft: "4px" }}>
+                    <span style={{ fontSize: "0.8em", color: "#f59e0b", marginLeft: "4px" }}>
                       ({r.reportedUser.role === "god_admin" ? "God Admin" : "Admin"})
                     </span>
                   )}
                 </strong>
-                {r.groupId?.name && <> in <em>{r.groupId.name}</em></>}
+                {r.groupId?.name && <> in <em style={{ color: "#a855f7" }}>{r.groupId.name}</em></>}
               </p>
-              <p style={{ margin: "0 0 10px", color: "#555" }}>Reason: "{r.reason}"</p>
+              <p style={{ margin: "0 0 10px", color: "#cbd5e1" }}>Reason: "{r.reason}"</p>
 
               <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                 {filter === "admin" ? (

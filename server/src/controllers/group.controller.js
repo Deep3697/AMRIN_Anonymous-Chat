@@ -4,12 +4,13 @@ import { Group } from "../models/group.model.js";
 
 export async function getMyGroups(req, res) {
   try {
+    const userObjectId = new mongoose.Types.ObjectId(req.user.sub);
     let groups;
     if (["god_admin", "main_admin"].includes(req.user.role)) {
       // Admins see all groups across the platform
       const allGroups = await Group.find().sort({ lastMessageAt: -1, createdAt: -1 });
       
-      const adminMemberships = await Membership.find({ userId: req.user.sub });
+      const adminMemberships = await Membership.find({ userId: userObjectId });
       const membershipMap = new Map(adminMemberships.map(m => [m.groupId.toString(), m]));
 
       const groupsWithUnread = await Promise.all(allGroups.map(async (g) => {
@@ -18,7 +19,7 @@ export async function getMyGroups(req, res) {
         const unreadCount = await mongoose.model("Message").countDocuments({
           threadId: g._id,
           createdAt: { $gt: mem?.lastReadAt || new Date(0) },
-          senderId: { $ne: req.user.sub }
+          senderId: { $ne: userObjectId }
         });
 
         return {
@@ -34,7 +35,7 @@ export async function getMyGroups(req, res) {
       const universalGroups = await Group.find({ level: "universal" });
       if (universalGroups.length > 0) {
         const membershipsToInsert = universalGroups.map(ug => ({ 
-          userId: req.user.sub, 
+          userId: userObjectId, 
           groupId: ug._id 
         }));
         // ordered: false allows it to silently skip existing memberships without throwing errors
@@ -42,7 +43,7 @@ export async function getMyGroups(req, res) {
       }
 
       // Regular members only see groups they have membership for
-      const memberships = await Membership.find({ userId: req.user.sub }).populate("groupId");
+      const memberships = await Membership.find({ userId: userObjectId }).populate("groupId");
       
       const groupsWithUnread = await Promise.all(memberships.map(async (m) => {
         if (!m.groupId) return null;
@@ -51,7 +52,7 @@ export async function getMyGroups(req, res) {
         const unreadCount = await mongoose.model("Message").countDocuments({
           threadId: m.groupId._id,
           createdAt: { $gt: m.lastReadAt || new Date(0) },
-          senderId: { $ne: req.user.sub } // optional: don't count own messages
+          senderId: { $ne: userObjectId } // optional: don't count own messages
         });
 
         return {

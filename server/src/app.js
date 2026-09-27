@@ -14,6 +14,7 @@ import blockRoutes from "./routes/block.routes.js";
 import banRoutes from "./routes/ban.routes.js";
 import banAppealRoutes from "./routes/banAppeal.routes.js";
 import muteRoutes from "./routes/mute.routes.js";
+import adminStatsRoutes from "./routes/adminStats.routes.js";
 
 
 const app = express();
@@ -48,6 +49,7 @@ app.use("/api/block", blockRoutes);
 app.use("/api/bans", banRoutes);
 app.use("/api/ban-appeals", banAppealRoutes);
 app.use("/api/mutes", muteRoutes);
+app.use("/api/admin", adminStatsRoutes);
 
 // We export the app to be imported in index.js
 export { app };

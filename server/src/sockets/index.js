@@ -24,6 +24,7 @@ export function initSocket(io) {
     io.on("connection", async (socket) => {
         try {
             if (["god_admin", "main_admin"].includes(socket.user.role)) {
+                socket.join("admins");
                 const { Group } = await import("../models/group.model.js");
                 const allGroups = await Group.find({}, "_id");
                 allGroups.forEach(g => socket.join(g._id.toString()));
@@ -34,6 +35,9 @@ export function initSocket(io) {
             
             const convos = await Conversation.find({ participants: socket.user.sub });
             convos.forEach(c => socket.join(c._id.toString()));
+
+            // Also join user's own room for reliable real-time direct delivery
+            socket.join(socket.user.sub.toString());
         } catch (err) {
             console.error("Failed to join rooms:", err);
         }

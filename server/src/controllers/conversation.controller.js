@@ -1,5 +1,7 @@
+import mongoose from "mongoose";
 import { Conversation } from "../models/conversation.model.js";
 import { User } from "../models/user.model.js";
+import { Message } from "../models/message.model.js";
 
 export async function startConversation(req, res) {
   try {
@@ -18,11 +20,60 @@ export async function startConversation(req, res) {
 
 export async function getMyConversations(req, res) {
   try {
-    const convos = await Conversation.find({ participants: req.user.sub })
+    const userObjectId = new mongoose.Types.ObjectId(req.user.sub);
+    const convos = await Conversation.find({ participants: userObjectId })
       .populate("participants", "anonymousName")
-      .sort({ lastMessageAt: -1 });
-    return res.status(200).json({ conversations: convos });
-  } catch {
+      .sort({ lastMessageAt: -1, updatedAt: -1 });
+
+    const convosWithUnread = await Promise.all(
+      convos.map(async (c) => {
+        const lastReadEntry = c.lastReadBy?.find(
+          (lr) => String(lr.userId) === String(req.user.sub)
+        );
+        const lastReadAt = lastReadEntry ? lastReadEntry.lastReadAt : new Date(0);
+
+        const unreadCount = await Message.countDocuments({
+          threadId: c._id,
+          createdAt: { $gt: lastReadAt },
+          senderId: { $ne: userObjectId },
+        });
+
+        return {
+          ...c.toObject(),
+          unreadCount,
+        };
+      })
+    );
+
+    return res.status(200).json({ conversations: convosWithUnread });
+  } catch (err) {
+    console.error("getMyConversations error:", err);
+    return res.status(500).json({ error: "Something went wrong" });
+  }
+}
+
+export async function markConversationRead(req, res) {
+  try {
+    const { convoId } = req.params;
+    const userId = req.user.sub;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const now = new Date();
+
+    const convo = await Conversation.findById(convoId);
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+
+    const idx = (convo.lastReadBy || []).findIndex((lr) => String(lr.userId) === String(userId));
+    if (idx !== -1) {
+      convo.lastReadBy[idx].lastReadAt = now;
+    } else {
+      if (!convo.lastReadBy) convo.lastReadBy = [];
+      convo.lastReadBy.push({ userId: userObjectId, lastReadAt: now });
+    }
+    await convo.save();
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("markConversationRead error:", err);
     return res.status(500).json({ error: "Something went wrong" });
   }
 }

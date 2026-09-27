@@ -60,23 +60,24 @@ export default function HelpQueuePanel() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           {threads.map((thread) => (
-            <div key={thread._id} style={{ border: "1px solid #ccc", padding: "15px", borderRadius: "6px" }}>
+            <div key={thread._id} style={{ border: "1px solid #3e4155", padding: "15px", borderRadius: "8px", backgroundColor: "#1e202a" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <div>
-                  <strong>User: {thread.studentId?.anonymousName || "Unknown"}</strong> ({thread.studentId?.email || "No email"})
+                  <strong style={{ color: "#f3f4f6" }}>User: {thread.studentId?.anonymousName || "Unknown"}</strong> <span style={{ color: "#9ca3af" }}>({thread.studentId?.email || "No email"})</span>
                 </div>
-                <button onClick={() => handleResolve(thread._id)} style={{ padding: "4px 8px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+                <button onClick={() => handleResolve(thread._id)} style={{ padding: "6px 14px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600" }}>
                   ✓ Resolve
                 </button>
               </div>
-              <div style={{ marginTop: "10px", backgroundColor: "#f9f9f9", padding: "10px", borderRadius: "4px", maxHeight: "200px", overflowY: "auto" }}>
+              <div style={{ marginTop: "10px", backgroundColor: "#16171d", padding: "10px", borderRadius: "6px", maxHeight: "200px", overflowY: "auto", border: "1px solid #2e303a" }}>
                 {thread.messages.map((m, idx) => (
                   <div key={idx} style={{ marginBottom: "8px", textAlign: m.isAdmin ? "right" : "left" }}>
                     <span style={{
                       display: "inline-block",
-                      padding: "6px 10px",
+                      padding: "6px 12px",
                       borderRadius: "6px",
-                      backgroundColor: m.isAdmin ? "#d1ecf1" : "#e2e3e5",
+                      backgroundColor: m.isAdmin ? "#4338ca" : "#2e303a",
+                      color: m.isAdmin ? "#e0e7ff" : "#f3f4f6",
                       fontSize: "0.9em"
                     }}>
                       {m.text}

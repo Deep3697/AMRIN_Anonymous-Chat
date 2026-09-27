@@ -106,7 +106,23 @@ export function registerMessageHandlers(io, socket) {
       // Echo tempId back so the sender can replace its optimistic placeholder
       const payload = message.toObject();
       if (tempId) payload.tempId = tempId;
-      io.to(threadId).emit("message:new", payload);
+      payload.threadId = threadId.toString();
+      payload.senderId = user._id.toString();
+
+      const threadIdStr = threadId.toString();
+
+      if (threadType === "dm") {
+        const convo = await Conversation.findById(threadId);
+        let emitter = io.to(threadIdStr);
+        if (convo && convo.participants) {
+          convo.participants.forEach((p) => {
+            emitter = emitter.to(p.toString());
+          });
+        }
+        emitter.emit("message:new", payload);
+      } else {
+        io.to(threadIdStr).to("admins").emit("message:new", payload);
+      }
     } catch {
       socket.emit("message:error", { error: "Failed to send message", tempId });
     }
@@ -153,7 +169,7 @@ export function registerMessageHandlers(io, socket) {
       }
     }
     message.isDeleted = true;
-    
+
     // figure out deleter display name (in DMs, always use real name)
     const deleter = await User.findById(socket.user.sub);
     let deleterName = deleter ? deleter.anonymousName : "Unknown";

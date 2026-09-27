@@ -46,17 +46,17 @@ export default function BanAppealsPanel() {
           <div
             key={appeal._id}
             style={{
-              padding: "16px", border: "1px solid #e0e0e0", borderRadius: "8px",
-              marginBottom: "12px", backgroundColor: "#fafafa"
+              padding: "16px", border: "1px solid #3e4155", borderRadius: "8px",
+              marginBottom: "12px", backgroundColor: "#1e202a"
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong>{appeal.userId?.anonymousName || "Unknown"}</strong>
-              <span style={{ fontSize: "0.8em", color: "#888" }}>
+              <strong style={{ color: "#f3f4f6" }}>{appeal.userId?.anonymousName || "Unknown"}</strong>
+              <span style={{ fontSize: "0.8em", color: "#9ca3af" }}>
                 {new Date(appeal.createdAt).toLocaleString()}
               </span>
             </div>
-            <p style={{ margin: "8px 0", fontSize: "0.9em", color: "#333" }}>
+            <p style={{ margin: "8px 0", fontSize: "0.9em", color: "#cbd5e1" }}>
               <strong>Reason:</strong> {appeal.reason}
             </p>
             <input

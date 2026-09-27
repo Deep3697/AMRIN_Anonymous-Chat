@@ -33,12 +33,28 @@ async function ensureGroups({ names, types, level, batchId, institute, branch, d
   }
 }
 
+import { Message } from "../models/message.model.js";
+
 // ─── Helper: join a user to all groups matching a query ─────────────
 async function joinUserToGroups(userId, groupQuery) {
   const groups = await Group.find(groupQuery);
   const memberships = groups.map((g) => ({ userId, groupId: g._id }));
   if (memberships.length > 0) {
     await Membership.insertMany(memberships, { ordered: false }).catch(() => {});
+    
+    // Create system messages for each group the user joined
+    const user = await User.findById(userId).select("anonymousName");
+    if (user) {
+      const systemMessages = groups.map((g) => ({
+        threadId: g._id,
+        threadType: "group",
+        senderId: userId,
+        anonymousNameSnapshot: "System",
+        text: `${user.anonymousName} joined the group`,
+        type: "system",
+      }));
+      await Message.insertMany(systemMessages).catch(() => {});
+    }
   }
 }
 

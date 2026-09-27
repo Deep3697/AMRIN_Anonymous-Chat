@@ -84,6 +84,8 @@ export default function ChatPage() {
   // Help button visible for members and chat monitors only (not admins)
   const showHelpButton = user && !isAdmin;
 
+
+
   return (
     <div>
       <div

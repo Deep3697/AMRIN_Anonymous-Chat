@@ -7,6 +7,12 @@ import { startConversation } from "../../api/conversation.api";
 import { useChatStore } from "../../store/chatStore";
 import PollView from "./PollView";
 
+function formatTime(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
 export default function MessageBubble({ message, isOwnMessage, userRole, threadType }) {
   const ref = useRef();
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -17,8 +23,9 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   const [userPopupPos, setUserPopupPos] = useState({ x: 0, y: 0 });
 
   // Custom Modal State
-  const [modalConfig, setModalConfig] = useState(null); 
+  const [modalConfig, setModalConfig] = useState(null);
   const [modalInput, setModalInput] = useState("");
+  const [seenByViewers, setSeenByViewers] = useState(null); // null = hidden, [] = loading/empty, [...] = loaded
 
   const setActiveGroupId = useChatStore((s) => s.setActiveGroupId);
 
@@ -212,6 +219,17 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     setShowUserPopup(false);
   }
 
+  async function handleShowSeenBy(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setShowContextMenu(false);
+    try {
+      const res = await axiosClient.get(`/messages/${message._id}/seen-by`);
+      setSeenByViewers(res.data.viewers || []);
+    } catch {
+      setSeenByViewers([]);
+    }
+  }
+
   const isAdmin = ["god_admin", "main_admin"].includes(userRole);
   const isMonitor = userRole === "chat_monitor";
   const canEdit = isOwnMessage && !message.isOptimistic && (Date.now() - new Date(message.createdAt).getTime() < 5 * 60 * 1000);
@@ -233,7 +251,19 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
 
   return (
     <div ref={ref} style={{ position: "relative" }} onContextMenu={handleContextMenu}>
-      {message.isDeleted ? (
+      {message.type === "system" ? (
+        <div style={{
+          textAlign: "center", padding: "6px 0",
+          fontSize: "0.8em", color: "#888", fontStyle: "italic"
+        }}>
+          <span style={{
+            backgroundColor: "#f0f0f0", padding: "3px 12px", borderRadius: "10px",
+            display: "inline-block"
+          }}>
+            {message.text}
+          </span>
+        </div>
+      ) : message.isDeleted ? (
         <em style={{ color: "#888" }}>This message was deleted{message.deletedBySnapshot ? ` by ${message.deletedBySnapshot}` : ""}</em>
       ) : message.type === "poll" ? (
         <PollView message={message} />
@@ -259,7 +289,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
                 </div>
               </div>
             ) : (
-              <p style={{ margin: "0 0 6px 0", lineHeight: "1.4" }}>
+              <p style={{ margin: "0 0 2px 0", lineHeight: "1.4" }}>
                 <strong
                   onClick={handleNameClick}
                   style={{
@@ -271,7 +301,6 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
                   {message.anonymousNameSnapshot}:
                 </strong>{" "}
                 {message.text}
-                {message.isEdited && <span style={{ fontSize: "0.8em", color: "#888", marginLeft: "6px" }}>(edited)</span>}
               </p>
             )}
           </div>
@@ -303,8 +332,14 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
             </div>
           )}
 
-          {/* Seen status (below message) */}
-          {renderSeenLabel()}
+          {/* Timestamp + Seen status row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: isOwnMessage ? "flex-end" : "flex-start", gap: "6px", marginTop: "2px" }}>
+            {message.isEdited && <span style={{ fontSize: "0.7em", color: "#999", fontStyle: "italic" }}>edited</span>}
+            <span style={{ fontSize: "0.7em", color: "#999" }}>
+              {formatTime(message.createdAt)}
+            </span>
+            {renderSeenLabel()}
+          </div>
         </>
       )}
 
@@ -348,7 +383,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
                     <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
                   )}
                   <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
-                  <div style={{ ...menuBtnStyle, cursor: "default" }}>👁️ Seen by {message.seenBy?.length || 0}</div>
+                  <button type="button" onClick={handleShowSeenBy} style={menuBtnStyle}>👁️ Seen by {message.seenBy?.length || 0}</button>
                 </>
               )}
 
@@ -407,18 +442,18 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
 
       {/* Custom Modal for Alerts/Confirms/Prompts */}
       {modalConfig && (
-        <div 
+        <div
           onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}
           style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)", display: "flex", 
+            backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
             justifyContent: "center", alignItems: "center", zIndex: 10000
           }}
         >
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: "white", padding: "20px", borderRadius: "8px", 
+              backgroundColor: "white", padding: "20px", borderRadius: "8px",
               width: "320px", boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
             }}
           >
@@ -428,16 +463,16 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
                 {modalConfig.message}
               </p>
             )}
-            
+
             {modalConfig.type === "prompt" && (
-              <input 
+              <input
                 autoFocus
                 type="text"
                 placeholder={modalConfig.placeholder}
                 value={modalInput}
                 onChange={(e) => setModalInput(e.target.value)}
-                style={{ 
-                  width: "100%", padding: "8px", marginBottom: "16px", boxSizing: "border-box", 
+                style={{
+                  width: "100%", padding: "8px", marginBottom: "16px", boxSizing: "border-box",
                   borderRadius: "4px", border: "1px solid #ccc", outline: "none"
                 }}
                 onKeyDown={(e) => {
@@ -452,7 +487,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
 
             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
               {(modalConfig.type === "confirm" || modalConfig.type === "prompt") && (
-                <button 
+                <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}
                   style={{ padding: "6px 12px", border: "none", borderRadius: "4px", cursor: "pointer", backgroundColor: "#e2e6ea", color: "#333", fontWeight: "bold" }}
@@ -460,7 +495,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
                   Cancel
                 </button>
               )}
-              <button 
+              <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -475,6 +510,63 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
               >
                 {modalConfig.type === "alert" ? "OK" : "Submit"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seen By Viewer List Modal */}
+      {seenByViewers !== null && (
+        <div
+          onClick={() => setSeenByViewers(null)}
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+            justifyContent: "center", alignItems: "center", zIndex: 10001
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: "white", padding: "0", borderRadius: "10px",
+              width: "300px", boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+              maxHeight: "400px", overflow: "hidden", display: "flex", flexDirection: "column"
+            }}
+          >
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "14px 18px", borderBottom: "1px solid #eee"
+            }}>
+              <h4 style={{ margin: 0, color: "#333", fontSize: "0.95em" }}>👁️ Seen by {seenByViewers.length}</h4>
+              <button
+                onClick={() => setSeenByViewers(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2em", color: "#999", lineHeight: 1 }}
+              >✕</button>
+            </div>
+            <div style={{ overflowY: "auto", maxHeight: "320px", padding: "8px 0" }}>
+              {seenByViewers.length === 0 ? (
+                <div style={{ padding: "20px", color: "#888", textAlign: "center", fontSize: "0.9em" }}>
+                  No one has seen this message yet
+                </div>
+              ) : (
+                seenByViewers.map((v) => (
+                  <div key={v._id} style={{
+                    padding: "10px 18px", display: "flex", alignItems: "center", gap: "10px",
+                    borderBottom: "1px solid #f5f5f5"
+                  }}>
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "50%",
+                      backgroundColor: "#e0e7ff", display: "flex", alignItems: "center",
+                      justifyContent: "center", fontSize: "0.8em", fontWeight: "bold", color: "#4f46e5"
+                    }}>
+                      {(v.anonymousName || "?")[0].toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: "0.9em", fontWeight: "500", color: "#333" }}>
+                      {v.anonymousName || "Unknown"}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
