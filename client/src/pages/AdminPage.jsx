@@ -267,6 +267,7 @@ export default function AdminPage() {
     try {
       await logoutUser();
     } finally {
+      useChatStore.getState().setActiveGroupId(null);
       clearUser();
       navigate("/login");
     }

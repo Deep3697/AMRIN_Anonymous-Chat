@@ -19,6 +19,7 @@ export default function Sidebar() {
   const activeGroupId = useChatStore((s) => s.activeGroupId);
   const activeThreadType = useChatStore((s) => s.activeThreadType);
   const user = useAuthStore((s) => s.user);
+  const isAdmin = user && ["god_admin", "main_admin"].includes(user.role);
 
   useEffect(() => {
     if (!socket.connected) {
@@ -36,6 +37,14 @@ export default function Sidebar() {
         });
         return next;
       });
+
+      // Safety check: If activeGroupId points to a group the user doesn't belong to, switch to first valid group
+      if (activeThreadType === "group" && activeGroupId && gList.length > 0) {
+        const hasAccess = gList.some((g) => String(g._id) === String(activeGroupId));
+        if (!hasAccess && !isAdmin) {
+          setActiveGroupId(gList[0]._id, "group", gList[0].name);
+        }
+      }
     }).catch(() => { });
 
     fetchMyConversations().then((res) => {
@@ -128,7 +137,6 @@ export default function Sidebar() {
     };
   }, [activeGroupId, user]);
 
-  const isAdmin = user && ["god_admin", "main_admin"].includes(user.role);
   const activeTab = isAdmin ? "dms" : tab;
 
   return (

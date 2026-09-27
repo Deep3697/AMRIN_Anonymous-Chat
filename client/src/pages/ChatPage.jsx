@@ -70,6 +70,7 @@ export default function ChatPage() {
     try {
       await logoutUser();
     } finally {
+      useChatStore.getState().setActiveGroupId(null);
       clearUser();
       navigate("/login");
     }

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Membership } from "../models/membership.model.js";
 import { Group } from "../models/group.model.js";
+import { User } from "../models/user.model.js";
 
 // Computes unread counts for many groups in ONE database round-trip,
 // instead of the old pattern of one countDocuments() call per group.
@@ -46,6 +47,8 @@ export async function getMyGroups(req, res) {
         unreadCount: unreadByGroup[g._id.toString()] || 0,
       }));
     } else {
+      const currentUser = await User.findById(userObjectId);
+
       // Auto-sync: Ensure the user is a member of ALL universal groups.
       // This catches older users who registered before a universal group was created.
       const universalGroups = await Group.find({ level: "universal" });
@@ -56,6 +59,16 @@ export async function getMyGroups(req, res) {
         }));
         // ordered: false allows it to silently skip existing memberships without throwing errors
         await Membership.insertMany(membershipsToInsert, { ordered: false }).catch(() => {});
+      }
+
+      // Cleanup: If a regular member has not been assigned a batch yet,
+      // they must only be in universal groups — purge any accidental batch/branch memberships.
+      if (currentUser && !currentUser.batchId) {
+        const nonUniversalGroups = await Group.find({ level: { $ne: "universal" } }).select("_id");
+        if (nonUniversalGroups.length > 0) {
+          const nonUniIds = nonUniversalGroups.map((g) => g._id);
+          await Membership.deleteMany({ userId: userObjectId, groupId: { $in: nonUniIds } }).catch(() => {});
+        }
       }
 
       // Regular members only see groups they have membership for
@@ -84,10 +97,13 @@ export async function getMyGroups(req, res) {
 }
 
 export async function markAsRead(req, res) {
-  await Membership.updateOne(
-    { userId: req.user.sub, groupId: req.params.groupId },
-    { lastReadAt: new Date() },
-    { upsert: true }
-  );
-  return res.status(200).json({ message: "Marked read" });
+  try {
+    await Membership.updateOne(
+      { userId: req.user.sub, groupId: req.params.groupId },
+      { lastReadAt: new Date() }
+    );
+    return res.status(200).json({ message: "Marked read" });
+  } catch {
+    return res.status(500).json({ error: "Something went wrong" });
+  }
 }
