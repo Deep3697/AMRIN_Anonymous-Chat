@@ -5,6 +5,7 @@ import axiosClient from "../../api/axiosClient";
 import { submitReport } from "../../api/admin.api";
 import { startConversation } from "../../api/conversation.api";
 import { useChatStore } from "../../store/chatStore";
+import PollView from "./PollView";
 
 export default function MessageBubble({ message, isOwnMessage, userRole }) {
   const ref = useRef();
@@ -199,6 +200,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
     <div ref={ref} style={{ position: "relative" }} onContextMenu={handleContextMenu}>
       {message.isDeleted ? (
         <em style={{ color: "#888" }}>This message was deleted{message.deletedBySnapshot ? ` by ${message.deletedBySnapshot}` : ""}</em>
+      ) : message.type === "poll" ? (
+        <PollView message={message} />
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -253,6 +256,11 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
               )}
               {message.attachment.type === "audio" && (
                 <audio src={message.attachment.url} controls style={{ display: "block", marginTop: "4px" }} />
+              )}
+              {message.attachment.type === "file" && (
+                <a href={message.attachment.url} target="_blank" rel="noreferrer" style={{ display: "block", padding: "8px 12px", backgroundColor: "#f0f0f0", borderRadius: "6px", textDecoration: "none", color: "#333" }}>
+                  📄 {message.attachment.fileName || "Download file"}
+                </a>
               )}
               {message.attachment.caption && (
                 <p style={{ fontSize: "0.9em", color: "#555", marginTop: "4px" }}>{message.attachment.caption}</p>

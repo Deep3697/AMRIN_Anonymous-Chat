@@ -1,20 +1,36 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import socket from "../../socket/socketClient";
 import axiosClient from "../../api/axiosClient";
 import { useChatStore } from "../../store/chatStore";
 import { useAuthStore } from "../../store/authStore";
 import OpportunityCard from "./OpportunityCard";
 import { uploadMedia } from "../../utils/uploadMedia";
+import PollCreator from "./PollCreator";
 
 export default function ChatWindow() {
   const activeGroupId = useChatStore((s) => s.activeGroupId);
   const activeThreadType = useChatStore((s) => s.activeThreadType) || "group";
   const activeThreadName = useChatStore((s) => s.activeThreadName);
   const user = useAuthStore((s) => s.user);
-  const [messages, setMessages] = useState([]);
+  const queryClient = useQueryClient();
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ["messages", activeGroupId],
+    queryFn: () => axiosClient.get(`/messages/${activeGroupId}`).then((r) => r.data.messages || []),
+    enabled: !!activeGroupId,
+  });
+
+  function setMessages(updater) {
+    queryClient.setQueryData(["messages", activeGroupId], (old = []) =>
+      typeof updater === "function" ? updater(old) : updater
+    );
+  }
+  
   const [text, setText] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -68,7 +84,6 @@ export default function ChatWindow() {
       socket.off("message:seenUpdate");
       socket.off("message:error");
       socket.disconnect();
-      setMessages([]);
     };
   }, [activeGroupId, activeThreadType]);
 
@@ -97,7 +112,10 @@ export default function ChatWindow() {
     };
 
     if (fileToUpload) {
-      const type = fileToUpload.type.startsWith("image") ? "image" : fileToUpload.type.startsWith("video") ? "video" : "audio";
+      const type = fileToUpload.type.startsWith("image") ? "image"
+        : fileToUpload.type.startsWith("video") ? "video"
+        : fileToUpload.type.startsWith("audio") ? "audio"
+        : "file";
       optimisticMessage.attachment = { type, url: URL.createObjectURL(fileToUpload), caption: "" };
     }
 
@@ -110,7 +128,7 @@ export default function ChatWindow() {
           threadId: activeGroupId, 
           threadType: activeThreadType, 
           text: currentText, 
-          attachment: { type: optimisticMessage.attachment.type, url, publicId, caption: "" },
+          attachment: { type: optimisticMessage.attachment.type, url, publicId, caption: "", fileName: fileToUpload.name },
           tempId 
         });
       } catch (err) {
@@ -198,15 +216,23 @@ export default function ChatWindow() {
         />
         <input 
           type="file" 
-          accept="image/*,video/*,audio/*" 
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip" 
           onChange={handleFileUpload} 
           style={{ cursor: "pointer" }}
           disabled={isUploading}
         />
+        <button type="button" onClick={() => setShowPollCreator(true)} style={{ padding: "10px", cursor: "pointer" }}>📊</button>
         <button type="submit" disabled={isUploading || (!text.trim() && !pendingAttachment)} style={{ padding: "10px 20px", cursor: "pointer", backgroundColor: "#007bff", color: "white", border: "none", borderRadius: "4px", opacity: (isUploading || (!text.trim() && !pendingAttachment)) ? 0.6 : 1 }}>
           {isUploading ? "Sending..." : "Send"}
         </button>
       </form>
+      {showPollCreator && (
+        <PollCreator
+          threadId={activeGroupId}
+          threadType={activeThreadType}
+          onClose={() => setShowPollCreator(false)}
+        />
+      )}
     </div>
   );
 }
