@@ -7,6 +7,9 @@ import AssignBranchPanel from "../components/admin/AssignBranchPanel";
 import AssignDivisionPanel from "../components/admin/AssignDivisionPanel";
 import PendingRequestsQueue from "../components/admin/PendingRequestsQueue";
 import ReportsQueue from "../components/admin/ReportsQueue";
+import BanPanel from "../components/admin/BanPanel";
+import BanAppealsPanel from "../components/admin/BanAppealsPanel";
+import MutePanel from "../components/admin/MutePanel";
 import { useAuthStore } from "../store/authStore";
 import { logoutUser } from "../api/auth.api";
 
@@ -14,6 +17,8 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const isGodAdmin = user?.role === "god_admin";
 
   async function handleLogout() {
     try {
@@ -76,6 +81,23 @@ export default function AdminPage() {
 
       {/* User Reports */}
       <ReportsQueue />
+      <hr style={{ margin: "20px 0" }} />
+
+      {/* Mute Management */}
+      <MutePanel />
+      <hr style={{ margin: "20px 0" }} />
+
+      {/* Ban Management */}
+      <BanPanel />
+      <hr style={{ margin: "20px 0" }} />
+
+      {/* Ban Appeals — God Admin Only */}
+      {isGodAdmin && (
+        <>
+          <BanAppealsPanel />
+          <hr style={{ margin: "20px 0" }} />
+        </>
+      )}
     </div>
   );
 }

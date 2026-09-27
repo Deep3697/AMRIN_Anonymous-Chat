@@ -1,7 +1,7 @@
 import { getDeadlineBorderColor } from "../../utils/borderColor";
 import MessageBubble from "./MessageBubble";
 
-export default function OpportunityCard({ message, isOwnMessage, userRole }) {
+export default function OpportunityCard({ message, isOwnMessage, userRole, threadType }) {
   const color = getDeadlineBorderColor(message.meta?.deadline);
   return (
     <div style={{ 
@@ -15,7 +15,7 @@ export default function OpportunityCard({ message, isOwnMessage, userRole }) {
       {message.isOptimistic && (
         <span style={{ fontSize: "0.75em", color: "#888", float: "right" }}>Sending...</span>
       )}
-      <MessageBubble message={message} isOwnMessage={isOwnMessage} userRole={userRole} />
+      <MessageBubble message={message} isOwnMessage={isOwnMessage} userRole={userRole} threadType={threadType} />
     </div>
   );
 }

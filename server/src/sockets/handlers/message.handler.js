@@ -4,6 +4,7 @@ import { Group } from "../../models/group.model.js";
 import { Conversation } from "../../models/conversation.model.js";
 import { Membership } from "../../models/membership.model.js";
 import { RoleAssignment } from "../../models/roleAssignment.model.js";
+import { Block } from "../../models/block.model.js";
 import { isClean, isMuted, recordOffence } from "../../services/moderation.service.js";
 import { getEmbedding, isDuplicate } from "../../services/duplicate.service.js";
 import { extractDeadline } from "../../services/deadline.service.js";
@@ -27,9 +28,35 @@ export function registerMessageHandlers(io, socket) {
       }
 
       const user = await User.findById(socket.user.sub);
+
+      // Check if user is banned
+      if (user.status === "banned" && user.bannedUntil && user.bannedUntil > new Date()) {
+        return socket.emit("message:error", { error: "You are banned until " + user.bannedUntil, tempId });
+      }
+
       if (await isMuted(user)) {
         return socket.emit("message:error", { error: "You are muted until " + user.mutedUntil, tempId });
       }
+
+      // Check block in DMs
+      if (threadType === "dm") {
+        const convo = await Conversation.findById(threadId);
+        if (convo) {
+          const otherUserId = convo.participants.find(p => p.toString() !== socket.user.sub);
+          if (otherUserId) {
+            const blocked = await Block.findOne({
+              $or: [
+                { blockerId: socket.user.sub, blockedId: otherUserId },
+                { blockerId: otherUserId, blockedId: socket.user.sub },
+              ]
+            });
+            if (blocked) {
+              return socket.emit("message:error", { error: "Cannot send messages — user blocked", tempId });
+            }
+          }
+        }
+      }
+
       if (text && !isClean(text)) {
         await recordOffence(user._id, text);
         return socket.emit("message:error", { error: "Message blocked by moderation", tempId });
@@ -49,10 +76,14 @@ export function registerMessageHandlers(io, socket) {
         }
       }
 
-      // Admin display name override: admins show as "God_Admin" / "Admin" in group chats
-      const adminDisplayName = getAdminDisplayName(user.role);
-      let displayName = adminDisplayName || user.anonymousName;
-      if (user.role === "chat_monitor") displayName += "(monitor)";
+      // Admin display name override: admins show as "God_Admin" / "Admin" in group chats only
+      // In DMs, everyone is equal — always use real anonymousName
+      let displayName = user.anonymousName;
+      if (threadType === "group") {
+        const adminDisplayName = getAdminDisplayName(user.role);
+        displayName = adminDisplayName || user.anonymousName;
+        if (user.role === "chat_monitor") displayName += "(monitor)";
+      }
 
       const message = await Message.create({
         threadId,
@@ -100,27 +131,37 @@ export function registerMessageHandlers(io, socket) {
     io.to(message.threadId.toString()).emit("message:updated", message);
   });
 
-  // ── Delete (owner, monitors in their group, or admins) ──
+  // ── Delete (owner, monitors in their group, or admins — DMs: owner only) ──
   socket.on("message:delete", async ({ messageId }) => {
     const message = await Message.findById(messageId);
     if (!message) return;
     const isOwner = message.senderId.toString() === socket.user.sub;
-    const isAdmin = ["god_admin", "main_admin"].includes(socket.user.role);
-    // Chat monitors can only delete in groups they are assigned to
-    const isMonitorHere = socket.user.role === "chat_monitor"
-      && await RoleAssignment.exists({ userId: socket.user.sub, groupId: message.threadId, isActive: true });
 
-    if (!isOwner && !isAdmin && !isMonitorHere) {
-      return socket.emit("message:error", { error: "Not authorized to delete" });
+    // In DMs, only the owner can delete their own message — no privileges
+    if (message.threadType === "dm") {
+      if (!isOwner) {
+        return socket.emit("message:error", { error: "You can only delete your own messages in DMs" });
+      }
+    } else {
+      const isAdmin = ["god_admin", "main_admin"].includes(socket.user.role);
+      // Chat monitors can only delete in groups they are assigned to
+      const isMonitorHere = socket.user.role === "chat_monitor"
+        && await RoleAssignment.exists({ userId: socket.user.sub, groupId: message.threadId, isActive: true });
+
+      if (!isOwner && !isAdmin && !isMonitorHere) {
+        return socket.emit("message:error", { error: "Not authorized to delete" });
+      }
     }
     message.isDeleted = true;
     
-    // figure out deleter display name
+    // figure out deleter display name (in DMs, always use real name)
     const deleter = await User.findById(socket.user.sub);
     let deleterName = deleter ? deleter.anonymousName : "Unknown";
-    if (socket.user.role === "god_admin") deleterName = "God_Admin";
-    else if (socket.user.role === "main_admin") deleterName = "Admin";
-    else if (socket.user.role === "chat_monitor") deleterName += "(monitor)";
+    if (message.threadType === "group") {
+      if (socket.user.role === "god_admin") deleterName = "God_Admin";
+      else if (socket.user.role === "main_admin") deleterName = "Admin";
+      else if (socket.user.role === "chat_monitor") deleterName += "(monitor)";
+    }
 
     message.deletedBySnapshot = deleterName;
     // Keep the original text in DB but clear it from broadcasts

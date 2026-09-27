@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/layout/Sidebar";
 import ChatWindow from "../components/chat/ChatWindow";
 import HelpModal from "../components/help/HelpModal";
+import BanAppealModal from "../components/help/BanAppealModal";
+import CanteenList from "../components/canteen/CanteenList";
 import { useAuthStore } from "../store/authStore";
 import { logoutUser } from "../api/auth.api";
 import { searchUsersByName, startConversation } from "../api/conversation.api";
@@ -12,11 +14,15 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
   const [showHelp, setShowHelp] = useState(false);
+  const [showCanteen, setShowCanteen] = useState(false);
   const setActiveGroupId = useChatStore((s) => s.setActiveGroupId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+
+  // Check if user is banned
+  const isBanned = user?.status === "banned" || (user?.bannedUntil && new Date(user.bannedUntil) > new Date());
 
   // Debounced search
   useEffect(() => {
@@ -61,6 +67,11 @@ export default function ChatPage() {
     }
   }
 
+  // If user is banned, show only the ban appeal screen
+  if (isBanned) {
+    return <BanAppealModal />;
+  }
+
   const isAdmin = user && ["god_admin", "main_admin"].includes(user.role);
   // Help button visible for members and chat monitors only (not admins)
   const showHelpButton = user && !isAdmin;
@@ -76,7 +87,7 @@ export default function ChatPage() {
           borderBottom: "1px solid #ccc",
         }}
       >
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span>Logged in as: <strong>{user?.anonymousName || "Unknown"}</strong> ({user?.role || "member"})</span>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -127,6 +138,18 @@ export default function ChatPage() {
             )}
           </div>
 
+          {/* Canteen Button - Placed left of Help button */}
+          <button
+            onClick={() => setShowCanteen(true)}
+            style={{
+              padding: "6px 14px", cursor: "pointer",
+              backgroundColor: "#ff9800", color: "white",
+              border: "none", borderRadius: "4px", fontWeight: "bold",
+            }}
+          >
+            🍽️ Canteen
+          </button>
+
           {showHelpButton && (
             <button
               onClick={() => setShowHelp(true)}
@@ -162,6 +185,29 @@ export default function ChatPage() {
 
       {/* Help Modal */}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {/* Canteen Modal */}
+      {showCanteen && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.4)", display: "flex",
+            justifyContent: "center", alignItems: "center", zIndex: 10000,
+          }}
+          onClick={() => setShowCanteen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "white", borderRadius: "10px", padding: "24px",
+              width: "480px", maxWidth: "90vw", boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+              maxHeight: "80vh", overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CanteenList onClose={() => setShowCanteen(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

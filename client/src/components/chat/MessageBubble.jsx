@@ -7,7 +7,7 @@ import { startConversation } from "../../api/conversation.api";
 import { useChatStore } from "../../store/chatStore";
 import PollView from "./PollView";
 
-export default function MessageBubble({ message, isOwnMessage, userRole }) {
+export default function MessageBubble({ message, isOwnMessage, userRole, threadType }) {
   const ref = useRef();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
@@ -21,6 +21,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
   const [modalInput, setModalInput] = useState("");
 
   const setActiveGroupId = useChatStore((s) => s.setActiveGroupId);
+
+  const isDM = threadType === "dm";
 
   useEffect(() => {
     if (!isOwnMessage && message._id && !message.isOptimistic && !String(message._id).startsWith("temp_")) {
@@ -137,10 +139,31 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
     setShowContextMenu(false);
   }
 
+  // Block user in DM
+  function handleBlockUser(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setModalConfig({
+      type: "confirm",
+      title: "Block User",
+      message: `Block ${message.anonymousNameSnapshot}? They won't be able to message you anymore.`,
+      onConfirm: async () => {
+        try {
+          await axiosClient.post("/block", { blockedId: message.senderId });
+          setModalConfig({ type: "alert", title: "Blocked", message: `${message.anonymousNameSnapshot} has been blocked.` });
+        } catch (err) {
+          setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to block user" });
+        }
+      }
+    });
+    setShowContextMenu(false);
+  }
+
   // Click on sender name → popup with DM / Report options
   function handleNameClick(e) {
     e.stopPropagation();
     if (isOwnMessage || message.isOptimistic) return;
+    // In DMs, no name-click popup needed (you already know who they are)
+    if (isDM) return;
     setShowUserPopup(true);
     setUserPopupPos({ x: e.clientX, y: e.clientY });
   }
@@ -196,6 +219,18 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
   const isTargetMonitor = message.anonymousNameSnapshot?.endsWith("(monitor)");
   const isTargetAdmin = message.anonymousNameSnapshot === "Admin" || message.anonymousNameSnapshot === "God_Admin";
 
+  // Seen label: DM shows "Seen" / "Not Seen", group shows "Seen by N"
+  function renderSeenLabel() {
+    if (!isOwnMessage) return null;
+    if (isDM) {
+      const seenCount = message.seenBy?.length || 0;
+      return seenCount > 0
+        ? <span style={{ fontSize: "0.75em", color: "#28a745" }}>✓✓ Seen</span>
+        : <span style={{ fontSize: "0.75em", color: "#999" }}>✓ Not Seen</span>;
+    }
+    return <span style={{ fontSize: "0.75em", color: "#888" }}>👁️ Seen by {message.seenBy?.length || 0}</span>;
+  }
+
   return (
     <div ref={ref} style={{ position: "relative" }} onContextMenu={handleContextMenu}>
       {message.isDeleted ? (
@@ -228,8 +263,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
                 <strong
                   onClick={handleNameClick}
                   style={{
-                    cursor: isOwnMessage ? "default" : "pointer",
-                    textDecoration: isOwnMessage ? "none" : "underline",
+                    cursor: (isOwnMessage || isDM) ? "default" : "pointer",
+                    textDecoration: (isOwnMessage || isDM) ? "none" : "underline",
                     textDecorationStyle: "dotted",
                   }}
                 >
@@ -268,10 +303,12 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
             </div>
           )}
 
+          {/* Seen status (below message) */}
+          {renderSeenLabel()}
         </>
       )}
 
-      {/* Right-click context menu (WhatsApp-style floating) */}
+      {/* Right-click context menu */}
       {showContextMenu && (
         <div style={{
           position: "fixed", left: contextPos.x, top: contextPos.y,
@@ -279,42 +316,69 @@ export default function MessageBubble({ message, isOwnMessage, userRole }) {
           border: "1px solid #e0e0e0", borderRadius: "8px", zIndex: 9999,
           minWidth: "160px", overflow: "hidden", animation: "fadeIn 0.1s ease"
         }}>
-          {/* Own message actions */}
-          {isOwnMessage && (
+          {isDM ? (
+            /* ── DM Context Menu: No privileges, equal for all ── */
             <>
-              {canEdit && (
-                <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
-              )}
-              <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
-              <div style={{ ...menuBtnStyle, cursor: "default" }}>👁️ Seen by {message.seenBy?.length || 0}</div>
-            </>
-          )}
-
-          {/* Other's message actions */}
-          {!isOwnMessage && (
-            <>
-              {/* Report: visible for members and chat_monitors, NOT for admins */}
-              {!isAdmin && (
-                <button type="button" onClick={handleReport} style={menuBtnStyle}>🚩 Report</button>
-              )}
-
-              {/* Admin/Monitor moderation tools */}
-              {(isAdmin || isMonitor) && (
+              {isOwnMessage ? (
                 <>
-                  <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete Msg</button>
-                  <button type="button" onClick={handleMute} style={menuBtnStyle}>🔇 Mute 24h</button>
+                  {canEdit && (
+                    <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
+                  )}
+                  <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
+                  <div style={{ ...menuBtnStyle, cursor: "default" }}>
+                    {(message.seenBy?.length || 0) > 0
+                      ? <span style={{ color: "#28a745" }}>✓✓ Seen</span>
+                      : <span style={{ color: "#999" }}>✓ Not Seen</span>
+                    }
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={handleBlockUser} style={{ ...menuBtnStyle, color: "#dc3545" }}>🚫 Block User</button>
                 </>
               )}
-              {isAdmin && (
-                <button type="button" onClick={handleKick} style={{ ...menuBtnStyle, color: "#dc3545" }}>🥾 Kick User</button>
+            </>
+          ) : (
+            /* ── Group Context Menu: Full privileges based on role ── */
+            <>
+              {/* Own message actions */}
+              {isOwnMessage && (
+                <>
+                  {canEdit && (
+                    <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
+                  )}
+                  <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
+                  <div style={{ ...menuBtnStyle, cursor: "default" }}>👁️ Seen by {message.seenBy?.length || 0}</div>
+                </>
+              )}
+
+              {/* Other's message actions */}
+              {!isOwnMessage && (
+                <>
+                  {/* Report: visible for members and chat_monitors, NOT for admins */}
+                  {!isAdmin && (
+                    <button type="button" onClick={handleReport} style={menuBtnStyle}>🚩 Report</button>
+                  )}
+
+                  {/* Admin/Monitor moderation tools */}
+                  {(isAdmin || isMonitor) && (
+                    <>
+                      <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete Msg</button>
+                      <button type="button" onClick={handleMute} style={menuBtnStyle}>🔇 Mute 24h</button>
+                    </>
+                  )}
+                  {isAdmin && (
+                    <button type="button" onClick={handleKick} style={{ ...menuBtnStyle, color: "#dc3545" }}>🥾 Kick User</button>
+                  )}
+                </>
               )}
             </>
           )}
         </div>
       )}
 
-      {/* Username click popup: DM / Report */}
-      {showUserPopup && (
+      {/* Username click popup: DM / Report (only for group chats) */}
+      {showUserPopup && !isDM && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{

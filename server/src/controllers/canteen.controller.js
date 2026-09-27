@@ -1,7 +1,7 @@
 import { Canteen } from "../models/canteen.model.js";
 import { CrowdVote } from "../models/crowdVote.model.js";
 import { CrowdSlot } from "../models/crowdSlot.model.js";
-import { getCurrentSlotStart, getPreviousSlotStart } from "../utils/timeSlot.js";
+import { getCurrentSlotStart, getPreviousSlotStart } from "../utils/timeSlots.js";
 
 function computeAverageLevel(votes) {
   if (votes.length < 3) return null;

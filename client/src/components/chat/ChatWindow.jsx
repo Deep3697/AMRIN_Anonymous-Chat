@@ -182,7 +182,7 @@ export default function ChatWindow() {
           const isOwn = String(m.senderId) === String(user?._id) || String(m.senderId) === String(user?.sub) || m.anonymousNameSnapshot === user?.anonymousName;
           return (
             <div key={m._id} style={{ marginBottom: "12px", position: "relative" }}>
-              <OpportunityCard message={m} isOwnMessage={isOwn} userRole={user?.role || "member"} />
+              <OpportunityCard message={m} isOwnMessage={isOwn} userRole={user?.role || "member"} threadType={activeThreadType} />
             </div>
           );
         })}

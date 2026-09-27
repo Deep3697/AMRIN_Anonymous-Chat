@@ -104,6 +104,8 @@ export async function completeProfile(req, res) {
         id: user._id,
         anonymousName: user.anonymousName,
         role: user.role,
+        status: user.status,
+        bannedUntil: user.bannedUntil,
       },
     });
   } catch (err) {
@@ -136,7 +138,7 @@ export async function login(req, res) {
     issueSession(res, user);
 
     return res.status(200).json({
-      user: { id: user._id, anonymousName: user.anonymousName, role: user.role },
+      user: { id: user._id, anonymousName: user.anonymousName, role: user.role, status: user.status, bannedUntil: user.bannedUntil },
     });
   } catch (err) {
     console.error("login error:", err);
@@ -153,7 +155,7 @@ export async function session(req, res) {
       const user = await User.findById(payload.sub);
       if (user) {
         return res.status(200).json({
-          user: { id: user._id, anonymousName: user.anonymousName, role: user.role },
+          user: { id: user._id, anonymousName: user.anonymousName, role: user.role, status: user.status, bannedUntil: user.bannedUntil },
         });
       }
     } catch {
@@ -175,7 +177,7 @@ export async function session(req, res) {
 
     issueSession(res, user); // issues a fresh access token cookie
     return res.status(200).json({
-      user: { id: user._id, anonymousName: user.anonymousName, role: user.role },
+      user: { id: user._id, anonymousName: user.anonymousName, role: user.role, status: user.status, bannedUntil: user.bannedUntil },
     });
   } catch {
     return res.status(401).json({ error: "Not authenticated" });

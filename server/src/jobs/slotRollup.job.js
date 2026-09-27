@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { Canteen } from "../models/canteen.model.js";
 import { CrowdVote } from "../models/crowdVote.model.js";
 import { CrowdSlot } from "../models/crowdSlot.model.js";
-import { getPreviousSlotStart } from "../utils/timeSlot.js";
+import { getPreviousSlotStart } from "../utils/timeSlots.js";
 
 export function startSlotRollupJob() {
   cron.schedule("0 * * * *", async () => {
