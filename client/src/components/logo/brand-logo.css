@@ -1,0 +1,54 @@
+/* 
+ * 1. Define the custom font family locally.
+ * Ensure nevera.otf is in the SAME folder as this CSS file.
+ */
+@font-face {
+  font-family: 'Nevera';
+  src: url('./nevera.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 2. Container styling */
+.brand-container {
+  min-height: 54px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* 3. Text styling (Font family is applied via inline styles in JSX, but can also be added here as a fallback) */
+.brand-text {
+  margin: 0;
+  font-size: 40px;
+  font-weight: normal;
+  line-height: 1;
+  letter-spacing: 0.045em;
+  color: #032B43;
+  display: inline-flex;
+  align-items: center;
+  white-space: pre;
+}
+
+/* 4. Cursor styling */
+.brand-title-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 0.95em;
+  margin-left: 6px;
+  border-radius: 999px;
+  background-color: #3F88C5;
+  animation: brandCursorBlink 0.8s step-end infinite;
+}
+
+.brand-title-cursor.typing {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes brandCursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
