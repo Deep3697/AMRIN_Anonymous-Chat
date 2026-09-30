@@ -1,46 +1,64 @@
-/* 
- * 1. Define the custom font family locally.
- * Ensure nevera.otf is in the SAME folder as this CSS file.
- */
+/* Load Nevera from local .otf file */
 @font-face {
-  font-family: 'Nevera';
-  src: url('./nevera.otf') format('opentype');
+  font-family: "Nevera";
+  src: url("./nevera.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
-/* 2. Container styling */
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap");
+
+/* ── Brand Logo Container ─────────────────────────────────── */
 .brand-container {
-  min-height: 54px;
+  height: 58px;
   display: flex;
   justify-content: center;
   align-items: center;
-  text-align: center;
+  margin-bottom: 2px;
 }
 
-/* 3. Text styling (Font family is applied via inline styles in JSX, but can also be added here as a fallback) */
+/* ── Brand Text — Nevera for "AMRIN.CHAT" ─────────────────── */
 .brand-text {
-  margin: 0;
-  font-size: 40px;
+  font-family: "Nevera", sans-serif;
+  font-size: 42px;
   font-weight: normal;
-  line-height: 1;
-  letter-spacing: 0.045em;
-  color: #032B43;
+  letter-spacing: 0.04em;
+  color: #162a3a;
+  margin: 0;
   display: inline-flex;
   align-items: center;
-  white-space: pre;
+  line-height: 1.1;
 }
 
-/* 4. Cursor styling */
-.brand-title-cursor {
+/* ── Blinking cursor for brand logo ───────────────────────── */
+.cursor {
   display: inline-block;
   width: 3px;
-  height: 0.95em;
-  margin-left: 6px;
-  border-radius: 999px;
-  background-color: #3F88C5;
-  animation: brandCursorBlink 0.8s step-end infinite;
+  height: 0.82em;
+  background-color: #2a6f8e;
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: blink 0.85s step-end infinite;
+}
+
+.cursor.typing {
+  animation: none;
+  opacity: 1;
+}
+
+/* ── Cursor for title/subtitle typewriter ─────────────────── */
+.brand-title-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.82em;
+  background-color: #162a3a !important;
+  -webkit-text-fill-color: initial !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: blink 0.85s step-end infinite;
 }
 
 .brand-title-cursor.typing {
@@ -48,7 +66,14 @@
   opacity: 1;
 }
 
-@keyframes brandCursorBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
 }

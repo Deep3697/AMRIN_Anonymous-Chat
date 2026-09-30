@@ -1,132 +1,137 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./brand-logo.css";
-// 1. Import the physical font file directly into JavaScript
-import neveraFontUrl from "./nevera.otf"; 
 
+/**
+ * TypewriterText — Generic typewriter for titles.
+ * Uses Fredoka font (set via CSS on .auth-title).
+ */
 export function TypewriterText({
   text = "",
-  delay = 80,
-  minDelay = null,
-  maxDelay = null,
-  startDelay = 0,
+  delay = 60,
+  startDelay = 600,
   className = "",
   as: Component = "span",
   showCursor = true,
   hideCursorOnDone = false,
-  onComplete,
-  style = {},
+  active = true,
 }) {
   const [displayedText, setDisplayedText] = useState("");
   const [typing, setTyping] = useState(false);
   const [done, setDone] = useState(false);
+  const indexRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-    let timerId = null;
+    if (!active) return;
 
     setDisplayedText("");
-    setTyping(false);
     setDone(false);
-
-    const getTypingDelay = () => {
-      if (minDelay === null || maxDelay === null) return Math.max(20, delay);
-      return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-    };
-
-    let index = 0;
-    const typeNextCharacter = () => {
-      if (cancelled) return;
-      if (index >= text.length) {
-        setTyping(false);
-        setDone(true);
-        onComplete?.();
-        return;
-      }
-      setTyping(true);
-      setDisplayedText(text.slice(0, index + 1));
-      index += 1;
-      timerId = setTimeout(typeNextCharacter, getTypingDelay());
-    };
+    indexRef.current = 0;
+    let charTimeout = null;
 
     const startTimer = setTimeout(() => {
-      if (cancelled) return;
-      if (text.length === 0) {
-        setDone(true);
-        onComplete?.();
-        return;
-      }
-      typeNextCharacter();
-    }, Math.max(0, startDelay));
+      setTyping(true);
+
+      const typeCharacter = () => {
+        if (indexRef.current < text.length) {
+          const i = indexRef.current;
+          indexRef.current++;
+          setDisplayedText((prev) => prev + text.charAt(i));
+
+          const randomDelay =
+            Math.max(20, Math.floor(Math.random() * 50) + delay - 25);
+
+          charTimeout = setTimeout(typeCharacter, randomDelay);
+        } else {
+          setTyping(false);
+          setDone(true);
+        }
+      };
+
+      typeCharacter();
+    }, startDelay);
 
     return () => {
-      cancelled = true;
       clearTimeout(startTimer);
-      if (timerId) clearTimeout(timerId);
+      if (charTimeout) clearTimeout(charTimeout);
     };
-  }, [text, delay, minDelay, maxDelay, startDelay, onComplete]);
+  }, [text, delay, startDelay, active]);
+
+  if (!active && !done) return null;
 
   return (
-    <Component className={className} style={style}>
+    <Component className={className}>
       {displayedText}
       {showCursor && (!hideCursorOnDone || !done) && (
-        <span
-          className={`brand-title-cursor ${typing ? "typing" : ""}`}
-          aria-hidden="true"
-        />
+        <span className={`brand-title-cursor ${typing ? "typing" : ""}`} />
       )}
     </Component>
   );
 }
 
+/**
+ * BrandLogo — Types "AMRIN.CHAT" character by character in Nevera font.
+ * Calls onComplete() when the full text has been typed out.
+ */
 function BrandLogo({
-  text = "AMRIN CHAT",
-  delay = 90,
-  minDelay = 55,
-  maxDelay = 115,
-  startDelay = 150,
+  text = "AMRIN.CHAT",
+  delay = 150,
+  startDelay = 400,
   className = "",
-  hideCursorOnDone = false,
   onComplete,
 }) {
+  const [displayedText, setDisplayedText] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [done, setDone] = useState(false);
+  const indexRef = useRef(0);
 
-  // 2. Dynamically inject the @font-face rule on component mount
   useEffect(() => {
-    const styleSheet = document.createElement("style");
-    styleSheet.innerHTML = `
-      @font-face {
-        font-family: 'NeveraDynamic';
-        src: url('${neveraFontUrl}') format('opentype');
-        font-weight: normal;
-        font-style: normal;
-      }
-    `;
-    document.head.appendChild(styleSheet);
-    
-    // Cleanup on unmount
+    setDisplayedText("");
+    setDone(false);
+    indexRef.current = 0;
+    let charTimeout = null;
+
+    const startTimer = setTimeout(() => {
+      setTyping(true);
+
+      const typeCharacter = () => {
+        if (indexRef.current < text.length) {
+          const i = indexRef.current;
+          indexRef.current++;
+          setDisplayedText((prev) => prev + text.charAt(i));
+
+          // Extra pause on "." for dramatic effect
+          const currentChar = text.charAt(i);
+          let baseDelay = delay;
+          if (currentChar === ".") baseDelay = delay + 220;
+
+          const randomDelay =
+            Math.max(50, Math.floor(Math.random() * 80) + baseDelay - 40);
+
+          charTimeout = setTimeout(typeCharacter, randomDelay);
+        } else {
+          setTyping(false);
+          setDone(true);
+          if (onComplete) onComplete();
+        }
+      };
+
+      typeCharacter();
+    }, startDelay);
+
     return () => {
-      document.head.removeChild(styleSheet);
+      clearTimeout(startTimer);
+      if (charTimeout) clearTimeout(charTimeout);
     };
-  }, []);
+  }, [text, delay, startDelay]);
 
   return (
     <div className={`brand-container ${className}`}>
-      <TypewriterText
-        text={text}
-        delay={delay}
-        minDelay={minDelay}
-        maxDelay={maxDelay}
-        startDelay={startDelay}
-        as="h1"
-        className="brand-text"
-        showCursor
-        hideCursorOnDone={hideCursorOnDone}
-        onComplete={onComplete}
-        style={{ 
-          // 3. Map to the dynamically injected font name
-          fontFamily: "'NeveraDynamic', sans-serif", 
-          textTransform: "uppercase" 
-        }} 
-      />
+      <h1 className="brand-text">
+        {displayedText}
+        {!done && (
+          <span className={`cursor ${typing ? "typing" : ""}`} />
+        )}
+      </h1>
     </div>
   );
 }
