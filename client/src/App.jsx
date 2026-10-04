@@ -10,6 +10,7 @@ import RegisterForm from "./components/auth/RegisterForm";
 import ChatPage from "./pages/ChatPage";
 import AdminPage from "./pages/AdminPage";
 import AdminRoute from "./routes/AdminRoute";
+import ForgotPasswordForm from "./components/auth/ForgotPasswordForm";
 
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/login" element={<PublicRoute><LoginForm /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterForm /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordForm /></PublicRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Routes>
     </BrowserRouter>

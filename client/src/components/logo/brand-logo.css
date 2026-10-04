@@ -1,4 +1,6 @@
 /* Load Nevera from local .otf file */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap");
+
 @font-face {
   font-family: "Nevera";
   src: url("./nevera.otf") format("opentype");
@@ -7,7 +9,6 @@
   font-display: swap;
 }
 
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap");
 
 /* ── Brand Logo Container ─────────────────────────────────── */
 .brand-container {

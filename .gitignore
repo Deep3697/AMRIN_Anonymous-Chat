@@ -25,3 +25,21 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+SKILL.md
+
+# Cache and Testing
+.eslintcache
+coverage/
+.nyc_output/
+
+# Secrets and Keys
+*.pem
+*.key
+*.cert
+*.p12
+
+# Optional Tooling/Deployments
+.vercel/
+.netlify/
+.vite/
+.npm/

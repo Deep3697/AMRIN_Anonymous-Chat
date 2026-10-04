@@ -18,7 +18,18 @@ function getAdminDisplayName(role) {
 }
 
 export function registerMessageHandlers(io, socket) {
-  socket.on("group:join", (threadId) => socket.join(threadId));
+  socket.on("group:join", async (threadId) => {
+    // Admins can always join any group room
+    if (["god_admin", "main_admin"].includes(socket.user.role)) {
+      return socket.join(threadId);
+    }
+    // Regular users must have an active membership
+    const membership = await Membership.findOne({ userId: socket.user.sub, groupId: threadId });
+    if (!membership) {
+      return socket.emit("message:error", { error: "You are not a member of this group" });
+    }
+    socket.join(threadId);
+  });
 
   // ── Send a message (supports optimistic UI via tempId) ──
   socket.on("message:send", async ({ threadId, threadType, text, attachment, tempId }) => {
@@ -30,8 +41,11 @@ export function registerMessageHandlers(io, socket) {
       const user = await User.findById(socket.user.sub);
 
       // Check if user is banned
-      if (user.status === "banned" && user.bannedUntil && user.bannedUntil > new Date()) {
-        return socket.emit("message:error", { error: "You are banned until " + user.bannedUntil, tempId });
+      if (user.status === "banned") {
+        if (!user.bannedUntil || user.bannedUntil > new Date()) {
+          const msg = user.bannedUntil ? "You are banned until " + user.bannedUntil : "You are permanently banned";
+          return socket.emit("message:error", { error: msg, tempId });
+        }
       }
 
       if (await isMuted(user)) {
@@ -66,6 +80,14 @@ export function registerMessageHandlers(io, socket) {
       let deadline = null;
 
       if (threadType === "group") {
+        // Verify the sender is still a member of the group (unless admin)
+        if (!["god_admin", "main_admin"].includes(user.role)) {
+          const membership = await Membership.findOne({ userId: user._id, groupId: threadId });
+          if (!membership) {
+            return socket.emit("message:error", { error: "You are no longer a member of this group", tempId });
+          }
+        }
+
         const group = await Group.findById(threadId);
         if (group && ["opportunity", "promotion"].includes(group.type) && text) {
           embedding = await getEmbedding(text);
@@ -231,13 +253,27 @@ export function registerMessageHandlers(io, socket) {
       return socket.emit("message:error", { error: "Only admins can kick users" });
     }
     await Membership.deleteOne({ userId, groupId });
-    io.to(groupId).emit("user:kicked", { userId });
+    // Emit BEFORE removing from room so the kicked user receives the event
+    io.to(groupId.toString()).emit("user:kicked", { userId, groupId });
+    // Also emit directly to the user's personal room for reliability
+    io.to(userId.toString()).emit("user:kicked", { userId, groupId });
+    // Now remove the kicked user's sockets from the group room
+    io.in(userId.toString()).socketsLeave(groupId.toString());
     socket.emit("user:actionSuccess", { action: "kicked", userId });
   });
+  // ── Add a user to a group (admins only) ──
+  socket.on("user:add", async ({ userId, groupId }) => {
+    if (!["god_admin", "main_admin"].includes(socket.user.role)) {
+      return socket.emit("message:error", { error: "Only admins can add users" });
+    }
+    await Membership.create({ userId, groupId }).catch(() => { });
+    io.to(userId.toString()).emit("user:readded", { userId, groupId });
+    socket.emit("user:actionSuccess", { action: "added", userId });
+  });
 
-  // ── Promote/Demote monitor (admins only) ──
+  // ── Promote/Demote monitor (god_admin only) ──
   socket.on("user:promote", async ({ userId, groupId }) => {
-    if (!["god_admin", "main_admin"].includes(socket.user.role)) return;
+    if (socket.user.role !== "god_admin") return;
     await RoleAssignment.updateOne(
       { userId, groupId },
       { userId, groupId, assignedBy: socket.user.sub, isActive: true },
@@ -248,7 +284,7 @@ export function registerMessageHandlers(io, socket) {
   });
 
   socket.on("user:demote", async ({ userId, groupId }) => {
-    if (!["god_admin", "main_admin"].includes(socket.user.role)) return;
+    if (socket.user.role !== "god_admin") return;
     await RoleAssignment.deleteOne({ userId, groupId });
     await User.findByIdAndUpdate(userId, { role: "member" });
     socket.emit("user:actionSuccess", { action: "demoted", userId });

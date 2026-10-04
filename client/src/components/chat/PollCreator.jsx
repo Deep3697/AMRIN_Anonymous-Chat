@@ -17,20 +17,47 @@ export default function PollCreator({ threadId, threadType, onClose }) {
   }
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 10000 }}
-      onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", width: "360px" }}>
-        <h3 style={{ marginTop: 0 }}>Create Poll</h3>
-        <input placeholder="Question" value={question} onChange={(e) => setQuestion(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px", boxSizing: "border-box" }} />
-        {options.map((opt, i) => (
-          <input key={i} placeholder={`Option ${i + 1}`} value={opt} onChange={(e) => updateOption(i, e.target.value)}
-            style={{ width: "100%", padding: "8px", marginBottom: "8px", boxSizing: "border-box" }} />
-        ))}
-        <button type="button" onClick={() => setOptions((prev) => [...prev, ""])} style={{ marginBottom: "12px" }}>+ Add option</button>
-        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={createPoll} style={{ backgroundColor: "#007bff", color: "white", border: "none", padding: "8px 16px", borderRadius: "4px" }}>Create</button>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop" />
+      <div className="modal-card" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-inner">
+          <div className="modal-header-row">
+            <div className="modal-title">📊 Create Poll</div>
+            <button className="modal-close-btn" onClick={onClose}>✕</button>
+          </div>
+
+          <input
+            className="modal-input"
+            placeholder="What's your question?"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            style={{ marginBottom: 10 }}
+          />
+
+          {options.map((opt, i) => (
+            <input
+              key={i}
+              className="modal-input"
+              placeholder={`Option ${i + 1}`}
+              value={opt}
+              onChange={(e) => updateOption(i, e.target.value)}
+              style={{ marginBottom: 7 }}
+            />
+          ))}
+
+          <button
+            type="button"
+            className="modal-btn"
+            onClick={() => setOptions((prev) => [...prev, ""])}
+            style={{ marginBottom: 10, width: "100%" }}
+          >
+            + Add Option
+          </button>
+
+          <div className="modal-btn-row">
+            <button type="button" className="modal-btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="modal-btn modal-btn--primary" onClick={createPoll}>Create Poll</button>
+          </div>
         </div>
       </div>
     </div>

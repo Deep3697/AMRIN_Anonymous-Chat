@@ -40,6 +40,8 @@ export const reviewRequest = (requestId, decision, muteDuration) =>
   axiosClient.post("/monitor/requests/review", { requestId, decision, muteDuration });
 export const assignMonitor = (userId, groupId) =>
   axiosClient.post("/monitor/assign", { userId, groupId });
+export const createMonitorRequest = (groupId, action, targetUserId) =>
+  axiosClient.post("/monitor/requests", { groupId, action, targetUserId });
 
 // ─── User Reports ───────────────────────────────────────────────────
 export const submitReport = (reportedUser, groupId, reason) =>

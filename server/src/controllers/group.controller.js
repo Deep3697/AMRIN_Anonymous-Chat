@@ -58,7 +58,7 @@ export async function getMyGroups(req, res) {
           groupId: ug._id,
         }));
         // ordered: false allows it to silently skip existing memberships without throwing errors
-        await Membership.insertMany(membershipsToInsert, { ordered: false }).catch(() => {});
+        await Membership.insertMany(membershipsToInsert, { ordered: false }).catch(() => { });
       }
 
       // Cleanup: If a regular member has not been assigned a batch yet,
@@ -67,7 +67,7 @@ export async function getMyGroups(req, res) {
         const nonUniversalGroups = await Group.find({ level: { $ne: "universal" } }).select("_id");
         if (nonUniversalGroups.length > 0) {
           const nonUniIds = nonUniversalGroups.map((g) => g._id);
-          await Membership.deleteMany({ userId: userObjectId, groupId: { $in: nonUniIds } }).catch(() => {});
+          await Membership.deleteMany({ userId: userObjectId, groupId: { $in: nonUniIds } }).catch(() => { });
         }
       }
 
@@ -100,7 +100,8 @@ export async function markAsRead(req, res) {
   try {
     await Membership.updateOne(
       { userId: req.user.sub, groupId: req.params.groupId },
-      { lastReadAt: new Date() }
+      { $set: { lastReadAt: new Date() } },
+      { upsert: true }
     );
     return res.status(200).json({ message: "Marked read" });
   } catch {

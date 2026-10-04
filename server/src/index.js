@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import { app } from "./app.js";
 import connectDB from "./db/index.js";
 import { initSocket } from "./sockets/index.js";
+import { setIO } from "./utils/socketIO.js";
 import { startSlotRollupJob } from "./jobs/slotRollup.job.js";
 import { startBanExpiryJob } from "./jobs/banExpiry.job.js";
 
@@ -19,6 +20,7 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
+setIO(io);
 initSocket(io);
 
 // Connect to the database first, then start the server

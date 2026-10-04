@@ -2,7 +2,8 @@
    AMRIN Auth — Pure White with Whisper-Light Tints
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap');
 
 /* ── Variables ────────────────────────────────────────────── */
@@ -30,7 +31,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Manrope', 'Montserrat', system-ui, -apple-system, sans-serif;
   color: var(--amrin-text-main);
   background: #f8fafb;
 }
@@ -607,7 +608,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   border-radius: 10px;
   background: #ffffff;
   color: var(--amrin-navy);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 14px;
   outline: none;
   transition: all 0.25s ease;
@@ -634,7 +635,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   border-radius: 10px;
   background: #ffffff;
   color: var(--amrin-navy);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 14px;
   outline: none;
   transition: all 0.25s ease;
@@ -790,7 +791,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   background: none;
   border: none;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-weight: 500;
 }
 
@@ -810,7 +811,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   border-radius: 12px;
   background: linear-gradient(135deg, var(--amrin-teal-d) 0%, #24607e 45%, var(--amrin-teal) 100%);
   color: #ffffff;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1021,7 +1022,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   border-radius: 10px;
   background: #ffffff;
   text-align: center;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 22px;
   font-weight: 600;
   color: var(--amrin-navy);
@@ -1055,7 +1056,7 @@ box-shadow: 0 0 8px rgba(19, 85, 139, 0.45);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
   padding: 0;
   transition: color 0.2s ease;
 }

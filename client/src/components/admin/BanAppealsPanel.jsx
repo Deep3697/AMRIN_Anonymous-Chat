@@ -31,66 +31,59 @@ export default function BanAppealsPanel() {
 
   return (
     <div>
-      <h3>📝 Ban Appeals (God Admin Only)</h3>
+      <h3 className="admin-panel-title" style={{ marginBottom: "16px" }}>📝 Ban Appeals (God Admin Only)</h3>
 
       {message && (
-        <p style={{ fontSize: "0.9em", color: message.startsWith("✅") ? "#28a745" : "#dc3545", margin: "8px 0" }}>
+        <p className={`admin-status-msg ${message.startsWith("✅") ? "admin-status-msg--success" : "admin-status-msg--error"}`}>
           {message}
         </p>
       )}
 
       {appeals.length === 0 ? (
-        <p style={{ color: "#888", fontSize: "0.9em" }}>No pending ban appeals.</p>
+        <p className="admin-empty">No pending ban appeals.</p>
       ) : (
-        appeals.map((appeal) => (
-          <div
-            key={appeal._id}
-            style={{
-              padding: "16px", border: "1px solid #3e4155", borderRadius: "8px",
-              marginBottom: "12px", backgroundColor: "#1e202a"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ color: "#f3f4f6" }}>{appeal.userId?.anonymousName || "Unknown"}</strong>
-              <span style={{ fontSize: "0.8em", color: "#9ca3af" }}>
-                {new Date(appeal.createdAt).toLocaleString()}
-              </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          {appeals.map((appeal, idx) => (
+            <div
+              key={appeal._id}
+              className="admin-report-card admin-report-card--warning"
+              style={{ animationDelay: `${idx * 60}ms` }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <strong style={{ color: "var(--admin-text)", fontSize: "13px" }}>
+                  {appeal.userId?.anonymousName || "Unknown"}
+                </strong>
+                <span style={{ fontSize: "10px", color: "var(--admin-text-3)" }}>
+                  {new Date(appeal.createdAt).toLocaleString()}
+                </span>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: "12px", color: "var(--admin-text-2)" }}>
+                <strong style={{ color: "var(--admin-text-3)" }}>Reason:</strong> {appeal.reason}
+              </p>
+              <input
+                type="text"
+                placeholder="Add a review note (optional)..."
+                value={reviewNotes[appeal._id] || ""}
+                onChange={(e) => setReviewNotes({ ...reviewNotes, [appeal._id]: e.target.value })}
+                style={{ width: "100%", marginBottom: "12px", boxSizing: "border-box" }}
+              />
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => handleReview(appeal._id, "approved")}
+                  className="admin-btn admin-btn--success admin-btn--sm"
+                >
+                  ✅ Approve & Unban
+                </button>
+                <button
+                  onClick={() => handleReview(appeal._id, "rejected")}
+                  className="admin-btn admin-btn--danger admin-btn--sm"
+                >
+                  ❌ Reject
+                </button>
+              </div>
             </div>
-            <p style={{ margin: "8px 0", fontSize: "0.9em", color: "#cbd5e1" }}>
-              <strong>Reason:</strong> {appeal.reason}
-            </p>
-            <input
-              type="text"
-              placeholder="Add a note (optional)..."
-              value={reviewNotes[appeal._id] || ""}
-              onChange={(e) => setReviewNotes({ ...reviewNotes, [appeal._id]: e.target.value })}
-              style={{
-                padding: "6px", borderRadius: "4px", border: "1px solid #ccc",
-                width: "100%", marginBottom: "8px", boxSizing: "border-box", fontSize: "0.85em"
-              }}
-            />
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={() => handleReview(appeal._id, "approved")}
-                style={{
-                  padding: "6px 14px", backgroundColor: "#28a745", color: "white",
-                  border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
-                }}
-              >
-                ✅ Approve & Unban
-              </button>
-              <button
-                onClick={() => handleReview(appeal._id, "rejected")}
-                style={{
-                  padding: "6px 14px", backgroundColor: "#dc3545", color: "white",
-                  border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
-                }}
-              >
-                ❌ Reject
-              </button>
-            </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );

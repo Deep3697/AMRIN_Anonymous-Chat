@@ -65,6 +65,7 @@ export async function markConversationRead(req, res) {
     const idx = (convo.lastReadBy || []).findIndex((lr) => String(lr.userId) === String(userId));
     if (idx !== -1) {
       convo.lastReadBy[idx].lastReadAt = now;
+      convo.markModified("lastReadBy");
     } else {
       if (!convo.lastReadBy) convo.lastReadBy = [];
       convo.lastReadBy.push({ userId: userObjectId, lastReadAt: now });

@@ -39,43 +39,62 @@ export default function MutePanel() {
 
   return (
     <div>
-      <h3>🔇 Mute Management</h3>
+      <h3 className="admin-panel-title" style={{ marginBottom: "16px" }}>🔇 Mute Management</h3>
 
       {message && (
-        <p style={{ fontSize: "0.9em", color: message.startsWith("✅") ? "#28a745" : "#dc3545", margin: "8px 0" }}>
+        <p className={`admin-status-msg ${message.startsWith("✅") ? "admin-status-msg--success" : "admin-status-msg--error"}`}>
           {message}
         </p>
       )}
 
       {mutedUsers.length === 0 ? (
-        <p style={{ color: "#888", fontSize: "0.9em" }}>No users currently muted.</p>
+        <p className="admin-empty">No users currently muted.</p>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}>
+        <table className="admin-table">
           <thead>
-            <tr style={{ borderBottom: "2px solid #ddd", textAlign: "left" }}>
-              <th style={{ padding: "8px" }}>User</th>
-              <th style={{ padding: "8px" }}>Role</th>
-              <th style={{ padding: "8px" }}>Muted Until</th>
-              <th style={{ padding: "8px" }}>Time Remaining</th>
-              <th style={{ padding: "8px" }}>Offences</th>
-              <th style={{ padding: "8px" }}>Action</th>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Muted Until</th>
+              <th>Time Remaining</th>
+              <th>Offences</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {mutedUsers.map((u) => (
-              <tr key={u._id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: "8px", fontWeight: "bold" }}>{u.anonymousName}</td>
-                <td style={{ padding: "8px" }}>{u.role}</td>
-                <td style={{ padding: "8px" }}>{new Date(u.mutedUntil).toLocaleString()}</td>
-                <td style={{ padding: "8px", color: "#e67e22" }}>{getTimeRemaining(u.mutedUntil)}</td>
-                <td style={{ padding: "8px" }}>{u.offenceCount}</td>
-                <td style={{ padding: "8px" }}>
+              <tr key={u._id}>
+                <td>{u.anonymousName}</td>
+                <td>
+                  <span style={{
+                    padding: "2px 8px",
+                    borderRadius: "var(--admin-r-pill)",
+                    background: "var(--admin-primary-soft)",
+                    color: "var(--admin-primary)",
+                    fontSize: "10px",
+                    fontWeight: "700"
+                  }}>
+                    {u.role}
+                  </span>
+                </td>
+                <td>{new Date(u.mutedUntil).toLocaleString()}</td>
+                <td style={{ color: "var(--admin-warning)" }}>{getTimeRemaining(u.mutedUntil)}</td>
+                <td>
+                  <span style={{
+                    padding: "2px 8px",
+                    borderRadius: "var(--admin-r-pill)",
+                    background: u.offenceCount > 2 ? "var(--admin-danger-soft)" : "var(--admin-warning-soft)",
+                    color: u.offenceCount > 2 ? "var(--admin-danger)" : "var(--admin-warning)",
+                    fontSize: "10px",
+                    fontWeight: "800"
+                  }}>
+                    {u.offenceCount}
+                  </span>
+                </td>
+                <td>
                   <button
                     onClick={() => handleUnmute(u._id, u.anonymousName)}
-                    style={{
-                      padding: "4px 12px", backgroundColor: "#28a745", color: "white",
-                      border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "0.85em"
-                    }}
+                    className="admin-btn admin-btn--success admin-btn--sm"
                   >
                     🔊 Release Mute
                   </button>

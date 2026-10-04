@@ -9,7 +9,11 @@ export function isClean(text) {
 }
 
 export async function isMuted(user) {
-  return user.status === "muted" && user.mutedUntil && user.mutedUntil > new Date();
+  if (user.status === "muted") {
+    if (!user.mutedUntil) return true; // Permanent mute
+    return user.mutedUntil > new Date();
+  }
+  return false;
 }
 
 export async function recordOffence(userId, messageText) {

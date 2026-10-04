@@ -237,6 +237,13 @@ export default function RegisterForm() {
   async function handleEmailSubmit(e) {
     e.preventDefault();
     setError("");
+
+    const nirmaEmailRegex = /^[a-zA-Z0-9._%+-]+@nirmauni\.ac\.in$/i;
+    if (!nirmaEmailRegex.test(email)) {
+      setError("Please use your @nirmauni.ac.in email address");
+      return;
+    }
+
     setIsLoading(true);
     try {
       await registerEmail(email);

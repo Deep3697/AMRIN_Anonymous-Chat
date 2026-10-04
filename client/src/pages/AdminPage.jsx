@@ -22,7 +22,10 @@ import BanAppealsPanel from "../components/admin/BanAppealsPanel";
 import MutePanel from "../components/admin/MutePanel";
 import CreateCanteenPanel from "../components/admin/CreateCanteenPanel";
 import HelpQueuePanel from "../components/admin/HelpQueuePanel";
+import AssignMonitorPanel from "../components/admin/AssignMonitorPanel";
 import ChatWindow from "../components/chat/ChatWindow";
+
+import "./admin.css";
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -52,6 +55,7 @@ export default function AdminPage() {
   });
   const [batchGroups, setBatchGroups] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [actionNotification, setActionNotification] = useState(null);
 
   // DM state
   const [conversations, setConversations] = useState([]);
@@ -70,6 +74,9 @@ export default function AdminPage() {
     }
     if (tab === "batches") {
       loadBatches();
+      if (useChatStore.getState().activeThreadType === "dm") {
+        setActiveGroupId(null);
+      }
     }
     if (tab !== "batches" && tab !== "chat") {
       setActiveGroupId(null);
@@ -88,8 +95,25 @@ export default function AdminPage() {
   // Connect socket
   useEffect(() => {
     socket.connect();
-    return () => socket.disconnect();
-  }, []);
+    // Prevent state leakage on mount
+    const threadType = useChatStore.getState().activeThreadType;
+    if (activeTab === "batches" && threadType === "dm") {
+      setActiveGroupId(null);
+    }
+
+    const handleActionSuccess = ({ action }) => {
+      const labels = { muted: "🔇 User muted", kicked: "🚫 User kicked", added: "✅ User added", promoted: "⬆️ User promoted to monitor", demoted: "⬇️ User demoted to member" };
+      setActionNotification(labels[action] || `✅ Action: ${action}`);
+      setTimeout(() => setActionNotification(null), 3000);
+    };
+
+    socket.on("user:actionSuccess", handleActionSuccess);
+
+    return () => {
+      socket.off("user:actionSuccess", handleActionSuccess);
+      socket.disconnect();
+    };
+  }, [activeTab, setActiveGroupId]);
 
   // Fetch stats from database on mount and when refreshKey changes
   useEffect(() => {
@@ -345,164 +369,59 @@ export default function AdminPage() {
 
   // ── Sidebar Feature Tabs ──
   const sidebarTabs = [
-    { id: "overview", label: "📊 Overview", icon: "📊" },
-    { id: "batches_mgmt", label: "🎓 Batches & Assignment", icon: "🎓" },
-    { id: "users", label: "👥 User Management", icon: "👥" },
-    { id: "moderation", label: "🛡️ Moderation Tools", icon: "🛡️" },
-    { id: "reports", label: "🚩 Reports & Help", icon: "🚩" },
-    { id: "settings", label: "🍽️ Canteens & Settings", icon: "🍽️" },
-    { id: "batches", label: "💬 Batches & Chats", icon: "💬" },
+    { id: "overview", label: "Overview", icon: "📊" },
+    { id: "batches_mgmt", label: "Batches & Assignment", icon: "🎓" },
+    { id: "users", label: "User Management", icon: "👥" },
+    { id: "moderation", label: "Moderation Tools", icon: "🛡️" },
+    { id: "reports", label: "Reports & Help", icon: "🚩" },
+    { id: "settings", label: "Canteens & Settings", icon: "🍽️" },
+    { id: "batches", label: "Batches & Chats", icon: "💬" },
   ];
 
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      height: "100vh",
-      backgroundColor: "#16171d",
-      color: "#f3f4f6",
-      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      {/* ── Scoped Dark Mode Styles for Form Elements inside Panels ── */}
-      <style>{`
-        .admin-dark-theme input[type="text"],
-        .admin-dark-theme input[type="password"],
-        .admin-dark-theme input[type="number"],
-        .admin-dark-theme select,
-        .admin-dark-theme textarea {
-          background-color: #252836 !important;
-          color: #f3f4f6 !important;
-          border: 1px solid #3e4155 !important;
-          border-radius: 6px !important;
-          padding: 8px 12px !important;
-          font-size: 0.9em !important;
-          outline: none !important;
-          transition: border-color 0.2s;
-        }
-        .admin-dark-theme input:focus,
-        .admin-dark-theme select:focus,
-        .admin-dark-theme textarea:focus {
-          border-color: #aa3bff !important;
-        }
-        .admin-dark-theme button {
-          padding: 7px 14px;
-          border-radius: 6px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: filter 0.15s;
-        }
-        .admin-dark-theme button:hover {
-          filter: brightness(1.1);
-        }
-        .admin-dark-theme button[type="submit"] {
-          background-color: #7c3aed;
-          color: #fff;
-          border: none;
-        }
-        .admin-dark-theme hr {
-          border: none;
-          border-top: 1px solid #2e303a;
-          margin: 24px 0;
-        }
-        .admin-dark-theme h2, .admin-dark-theme h3, .admin-dark-theme h4 {
-          color: #f3f4f6;
-          margin-top: 0;
-        }
-        .admin-dark-theme table {
-          color: #e2e8f0;
-          border-color: #2e303a;
-        }
-        .admin-dark-theme th {
-          border-bottom: 2px solid #3e4155 !important;
-          color: #cbd5e1;
-        }
-        .admin-dark-theme td {
-          border-bottom: 1px solid #2e303a !important;
-          color: #e2e8f0;
-        }
-      `}</style>
-
-      {/* ── Topbar (KEPT AS WAS with original buttons & identity, styled in Dark Theme) ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "14px 24px",
-          borderBottom: "1px solid #2e303a",
-          backgroundColor: "#16171d",
-          color: "#f3f4f6",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{
-            width: "36px", height: "36px", borderRadius: "8px",
-            backgroundColor: "#7c3aed", display: "flex", alignItems: "center",
-            justifyContent: "center", fontWeight: "bold", fontSize: "1.2em", color: "white"
-          }}>C</div>
+    <div className="admin-root">
+      {/* ── Topbar ── */}
+      <div className="admin-topbar">
+        <div className="admin-topbar-left">
+          <div className="admin-brand-mark">
+            <span /><span /><span /><span />
+          </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <h1 style={{ margin: 0, fontSize: "1.35em", fontWeight: 700, color: "#f3f4f6", lineHeight: 1.2 }}>
+              <span className="admin-topbar-title">
                 {isGodAdmin ? "God Admin Dashboard" : "Admin Dashboard"}
-              </h1>
-              <span style={{
-                fontSize: "0.75em", padding: "2px 8px", borderRadius: "12px",
-                backgroundColor: isGodAdmin ? "#fef3c7" : "#e0e7ff",
-                color: isGodAdmin ? "#92400e" : "#3730a3", fontWeight: 600
-              }}>
+              </span>
+              <span className={`admin-topbar-badge ${isGodAdmin ? "admin-topbar-badge--god" : "admin-topbar-badge--admin"}`}>
                 {isGodAdmin ? "God Admin" : "Admin"}
               </span>
             </div>
-            <div style={{ fontSize: "0.78em", color: "#9ca3af", marginTop: "2px" }}>
+            <div className="admin-topbar-subtitle">
               Campus Chat Management Console
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <span style={{ fontSize: "0.9em", color: "#cbd5e1" }}>
-            Logged in as: <strong style={{ color: "#f3f4f6" }}>{user?.anonymousName || "Admin"}</strong> <span style={{ color: "#9ca3af" }}>({user?.role})</span>
-          </span>
+        <div className="admin-topbar-right">
+          <div className="admin-topbar-user">
+            Logged in as: <strong>{user?.anonymousName || "Admin"}</strong>
+            <span style={{ color: "var(--admin-text-3)" }}>({user?.role})</span>
+          </div>
           <button
             onClick={() => {
               setDmUnreadDot(false);
+              if (useChatStore.getState().activeThreadType === "group") {
+                setActiveGroupId(null);
+              }
               navigate("/chat");
             }}
-            style={{
-              position: "relative",
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "7px 16px", borderRadius: "6px", border: "1px solid #3e4155",
-              backgroundColor: "#1f2028", color: "#f3f4f6", cursor: "pointer",
-              fontSize: "0.85em", fontWeight: "600", transition: "background 0.15s"
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#2d303e"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#1f2028"; }}
+            className="admin-topbar-btn admin-topbar-btn--chat"
           >
             ← Go to Chat
-            {dmUnreadDot && (
-              <span style={{
-                position: "absolute",
-                top: "-4px",
-                right: "-4px",
-                width: "9px",
-                height: "9px",
-                borderRadius: "50%",
-                backgroundColor: "#ef4444",
-                boxShadow: "0 0 6px rgba(239, 68, 68, 0.9)",
-                display: "inline-block"
-              }} />
-            )}
+            {dmUnreadDot && <span className="admin-unread-dot" />}
           </button>
           <button
             onClick={handleLogout}
-            style={{
-              padding: "7px 14px", borderRadius: "6px", border: "none",
-              backgroundColor: "#dc2626", color: "white", cursor: "pointer",
-              fontSize: "0.85em", fontWeight: "600", transition: "background 0.15s"
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#b91c1c"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#dc2626"; }}
+            className="admin-topbar-btn admin-topbar-btn--logout"
           >
             Logout
           </button>
@@ -510,95 +429,68 @@ export default function AdminPage() {
       </div>
 
       {/* ── Body: Left Sidebar + Main Content ── */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="admin-body">
         {/* ── Left Sidebar for Features ── */}
-        <div style={{
-          width: "230px",
-          backgroundColor: "#12131a",
-          borderRight: "1px solid #2e303a",
-          color: "#9ca3af",
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0
-        }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid #2e303a", fontSize: "0.75em", fontWeight: "bold", letterSpacing: "1px", color: "#6b7280" }}>
-            ADMIN FEATURES
+        <div className="admin-sidebar">
+          <div className="admin-sidebar-header">
+            Admin Features
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+          <div className="admin-sidebar-list">
             {sidebarTabs.map((t) => {
               const isActive = activeTab === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => handleTabChange(t.id)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "10px",
-                    width: "100%", padding: "11px 18px", border: "none",
-                    backgroundColor: isActive ? "#1e2238" : "transparent",
-                    color: isActive ? "#ffffff" : "#9ca3af",
-                    fontWeight: isActive ? "600" : "normal",
-                    cursor: "pointer", fontSize: "0.88em", textAlign: "left",
-                    borderLeft: isActive ? "3px solid #aa3bff" : "3px solid transparent",
-                    transition: "all 0.15s ease", position: "relative"
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = "#181a24";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
-                  }}
+                  className={`admin-nav-btn ${isActive ? "admin-nav-btn--active" : ""}`}
                 >
-                  <span>{t.label}</span>
+                  <span className="admin-nav-icon">{t.icon}</span>
+                  <span className="admin-nav-label">{t.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* ── Main Content Area (Dark Theme) ── */}
-        <div className="admin-dark-theme" style={{ flex: 1, overflowY: "auto", backgroundColor: "#16171d", padding: activeTab === "batches" ? 0 : "28px 32px" }}>
+        {/* ── Main Content Area ── */}
+        <div className={`admin-main ${activeTab === "batches" ? "admin-main--flush" : ""}`}>
 
           {/* ── OVERVIEW TAB ── */}
           {activeTab === "overview" && (
             <div style={{ maxWidth: "1200px" }}>
-              <div style={{ marginBottom: "24px" }}>
-                <h2 style={{ margin: "0 0 6px", color: "#f3f4f6", fontSize: "1.6em" }}>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">
                   {isGodAdmin ? "God Admin" : "Admin"} Platform Overview
                 </h2>
-                <p style={{ color: "#9ca3af", margin: 0, fontSize: "0.9em" }}>
+                <p className="admin-page-subtitle">
                   Real-time database statistics, system events, and platform controls.
                 </p>
               </div>
 
-              {/* Stat Cards Connected to Database */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
+              {/* Stat Cards */}
+              <div className="admin-stats-grid">
                 {[
-                  { label: "TOTAL USERS", value: stats?.totalUsers ?? "—", color: "#aa3bff", bg: "rgba(170, 59, 255, 0.12)", icon: "👥" },
-                  { label: "ACTIVE GROUPS", value: stats?.activeGroups ?? "—", color: "#10b981", bg: "rgba(16, 185, 129, 0.12)", icon: "💬" },
-                  { label: "BATCHES", value: stats?.batchCount ?? "—", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", icon: "🎓", clickable: true, tab: "batches_mgmt" },
-                  { label: "MESSAGES TODAY", value: stats?.messagesToday ?? "—", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.12)", icon: "✉️" },
+                  { label: "TOTAL USERS", value: stats?.totalUsers ?? "—", color: "var(--admin-primary)", glow: "rgba(59, 184, 214, 0.1)", icon: "👥" },
+                  { label: "ACTIVE GROUPS", value: stats?.activeGroups ?? "—", color: "var(--admin-success)", glow: "rgba(53, 210, 161, 0.1)", icon: "💬" },
+                  { label: "BATCHES", value: stats?.batchCount ?? "—", color: "var(--admin-warning)", glow: "rgba(244, 178, 91, 0.1)", icon: "🎓", clickable: true, tab: "batches_mgmt" },
+                  { label: "MESSAGES TODAY", value: stats?.messagesToday ?? "—", color: "var(--admin-accent)", glow: "rgba(43, 208, 229, 0.1)", icon: "✉️" },
                 ].map((card) => (
                   <div
                     key={card.label}
                     onClick={card.clickable ? () => handleTabChange(card.tab) : undefined}
+                    className={`admin-stat-card ${card.clickable ? "admin-stat-card--clickable" : ""}`}
                     style={{
-                      backgroundColor: "#1f2028", borderRadius: "10px", padding: "20px",
-                      border: "1px solid #2e303a", borderLeft: `4px solid ${card.color}`,
-                      cursor: card.clickable ? "pointer" : "default",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                      transition: "transform 0.15s, border-color 0.15s"
+                      "--card-glow": card.glow,
+                      borderLeftColor: card.color,
+                      borderLeftWidth: "3px",
                     }}
-                    onMouseEnter={(e) => { if (card.clickable) e.currentTarget.style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={(e) => { if (card.clickable) e.currentTarget.style.transform = "none"; }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "0.75em", color: "#9ca3af", fontWeight: "600", letterSpacing: "0.5px" }}>
-                        {card.label}
-                      </span>
-                      <span style={{ fontSize: "1.1em" }}>{card.icon}</span>
+                    <div className="admin-stat-card-top">
+                      <span className="admin-stat-label">{card.label}</span>
+                      <span className="admin-stat-icon">{card.icon}</span>
                     </div>
-                    <div style={{ fontSize: "2em", fontWeight: "bold", color: card.color }}>
+                    <div className="admin-stat-value" style={{ color: card.color }}>
                       {card.value}
                     </div>
                   </div>
@@ -606,66 +498,61 @@ export default function AdminPage() {
               </div>
 
               {/* Quick Status Counters Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "28px" }}>
+              <div className="admin-counters-grid">
                 {[
-                  { label: "Pending Help", value: stats?.pendingHelp ?? 0, color: "#06b6d4", tab: "reports" },
-                  { label: "Pending Reports", value: stats?.pendingReports ?? 0, color: "#ef4444", tab: "reports" },
-                  { label: "Muted Users", value: stats?.mutedUsers ?? 0, color: "#f59e0b", tab: "moderation" },
-                  { label: "Banned Users", value: stats?.bannedUsers ?? 0, color: "#dc2626", tab: "moderation" },
+                  { label: "Pending Help", value: stats?.pendingHelp ?? 0, color: "var(--admin-accent)", tab: "reports" },
+                  { label: "Pending Reports", value: stats?.pendingReports ?? 0, color: "var(--admin-danger)", tab: "reports" },
+                  { label: "Muted Users", value: stats?.mutedUsers ?? 0, color: "var(--admin-warning)", tab: "moderation" },
+                  { label: "Banned Users", value: stats?.bannedUsers ?? 0, color: "var(--admin-danger)", tab: "moderation" },
                 ].map((item) => (
                   <div
                     key={item.label}
                     onClick={() => handleTabChange(item.tab)}
-                    style={{
-                      backgroundColor: "#1f2028", borderRadius: "10px", padding: "16px 20px",
-                      border: "1px solid #2e303a", cursor: "pointer",
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      transition: "background 0.15s"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#252836"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#1f2028"}
+                    className="admin-counter-card"
                   >
                     <div>
-                      <div style={{ fontSize: "0.8em", color: "#9ca3af", marginBottom: "4px" }}>{item.label}</div>
-                      <div style={{ fontSize: "1.4em", fontWeight: "bold", color: item.color }}>{item.value}</div>
+                      <div className="admin-counter-label">{item.label}</div>
+                      <div className="admin-counter-value" style={{ color: item.color }}>{item.value}</div>
                     </div>
-                    <span style={{ fontSize: "0.8em", color: "#6b7280" }}>View →</span>
+                    <span className="admin-counter-arrow">View →</span>
                   </div>
                 ))}
               </div>
 
-              {/* Recent Activity (Live from Database) + Quick Actions */}
-              <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: "20px" }}>
+              {/* Recent Activity + Quick Actions */}
+              <div className="admin-two-col">
                 {/* Recent Activity Feed */}
-                <div style={{ backgroundColor: "#1f2028", borderRadius: "10px", padding: "22px", border: "1px solid #2e303a" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <h3 style={{ margin: 0, color: "#f3f4f6", fontSize: "1.05em" }}>Live Database Activity</h3>
+                <div className="admin-panel">
+                  <div className="admin-panel-header">
+                    <h3 className="admin-panel-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span className="admin-live-pulse">
+                        <span className="admin-live-dot" />
+                        Live
+                      </span>
+                      Database Activity
+                    </h3>
                     <button
                       onClick={() => setRefreshKey((k) => k + 1)}
-                      style={{ background: "none", border: "none", color: "#aa3bff", cursor: "pointer", fontSize: "0.8em", padding: 0 }}
+                      className="admin-refresh-btn"
                     >
                       Refresh ↻
                     </button>
                   </div>
                   {recentActivity.length === 0 ? (
-                    <div style={{ color: "#9ca3af", fontSize: "0.9em", padding: "20px 0", textAlign: "center" }}>
+                    <div className="admin-empty">
                       No recent activity recorded yet.
                     </div>
                   ) : (
                     recentActivity.map((a, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "10px 0",
-                          borderBottom: i < recentActivity.length - 1 ? "1px solid #2e303a" : "none",
-                          display: "flex", justifyContent: "space-between", alignItems: "center"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.86em", color: "#e2e8f0" }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: a.color || "#aa3bff", display: "inline-block", flexShrink: 0 }} />
+                      <div key={i} className="admin-activity-item" style={{ animationDelay: `${i * 50}ms` }}>
+                        <div className="admin-activity-left">
+                          <span
+                            className="admin-activity-dot"
+                            style={{ backgroundColor: a.color || "var(--admin-primary)", "--dot-color": a.color || "var(--admin-primary)" }}
+                          />
                           <span>{a.text}</span>
                         </div>
-                        <div style={{ fontSize: "0.75em", color: "#6b7280", whiteSpace: "nowrap", marginLeft: "14px" }}>
+                        <div className="admin-activity-time">
                           {timeAgo(a.createdAt)}
                         </div>
                       </div>
@@ -674,36 +561,25 @@ export default function AdminPage() {
                 </div>
 
                 {/* Quick Action Shortcuts */}
-                <div style={{ backgroundColor: "#1f2028", borderRadius: "10px", padding: "22px", border: "1px solid #2e303a" }}>
-                  <h3 style={{ margin: "0 0 16px", color: "#f3f4f6", fontSize: "1.05em" }}>Quick Actions</h3>
+                <div className="admin-panel">
+                  <h3 className="admin-panel-title" style={{ marginBottom: "16px" }}>Quick Actions</h3>
                   {[
-                    { label: "🎓 Batches & Assignment", action: () => handleTabChange("batches_mgmt"), color: "#aa3bff", desc: "Create batch & assign users" },
-                    { label: "👥 User Management", action: () => handleTabChange("users"), color: "#10b981", desc: "Review pending monitor requests" },
-                    { label: "🚩 Review Reports & Help", action: () => handleTabChange("reports"), color: "#ef4444", desc: "Inspect user reports & open tickets" },
-                    { label: "🛡️ Moderation Tools", action: () => handleTabChange("moderation"), color: "#f59e0b", desc: "Manage mutes, bans, and appeals" },
-                    { label: "🍽️ Manage Canteens", action: () => handleTabChange("settings"), color: "#06b6d4", desc: "Configure campus food canteens" },
-                    { label: "💬 Batches & Chats View", action: () => handleTabChange("batches"), color: "#3b82f6", desc: "Drill down into batches & live groups" },
+                    { label: "🎓 Batches & Assignment", action: () => handleTabChange("batches_mgmt"), color: "var(--admin-primary)", desc: "Create batch & assign users" },
+                    { label: "👥 User Management", action: () => handleTabChange("users"), color: "var(--admin-success)", desc: "Review pending monitor requests" },
+                    { label: "🚩 Review Reports & Help", action: () => handleTabChange("reports"), color: "var(--admin-danger)", desc: "Inspect user reports & open tickets" },
+                    { label: "🛡️ Moderation Tools", action: () => handleTabChange("moderation"), color: "var(--admin-warning)", desc: "Manage mutes, bans, and appeals" },
+                    { label: "🍽️ Manage Canteens", action: () => handleTabChange("settings"), color: "var(--admin-accent)", desc: "Configure campus food canteens" },
+                    { label: "💬 Batches & Chats View", action: () => handleTabChange("batches"), color: "var(--admin-primary-bright)", desc: "Drill down into batches & live groups" },
                   ].map((qa) => (
                     <button
                       key={qa.label}
                       onClick={qa.action}
-                      style={{
-                        display: "flex", flexDirection: "column", width: "100%", padding: "10px 14px",
-                        marginBottom: "10px", border: "1px solid #2e303a", borderRadius: "8px",
-                        backgroundColor: "#16171d", cursor: "pointer", textAlign: "left",
-                        transition: "all 0.15s"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#252836";
-                        e.currentTarget.style.borderColor = qa.color;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "#16171d";
-                        e.currentTarget.style.borderColor = "#2e303a";
-                      }}
+                      className="admin-quick-action"
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = qa.color}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = ""}
                     >
-                      <span style={{ color: qa.color, fontWeight: "600", fontSize: "0.88em" }}>{qa.label}</span>
-                      <span style={{ color: "#9ca3af", fontSize: "0.75em", marginTop: "2px" }}>{qa.desc}</span>
+                      <span className="admin-quick-action-label" style={{ color: qa.color }}>{qa.label}</span>
+                      <span className="admin-quick-action-desc">{qa.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -714,28 +590,30 @@ export default function AdminPage() {
           {/* ── BATCHES & ASSIGNMENT TAB ── */}
           {activeTab === "batches_mgmt" && (
             <div style={{ maxWidth: "1000px" }}>
-              <h2 style={{ margin: "0 0 8px", color: "#f3f4f6" }}>🎓 Batches & Structural Assignment</h2>
-              <p style={{ color: "#9ca3af", marginBottom: "24px", fontSize: "0.9em" }}>
-                Create batches and assign student cohorts through Institute, Branch, and Division stages.
-              </p>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">🎓 Batches & Structural Assignment</h2>
+                <p className="admin-page-subtitle">
+                  Create batches and assign student cohorts through Institute, Branch, and Division stages.
+                </p>
+              </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <BatchCreateForm onBatchCreated={() => { setRefreshKey((k) => k + 1); loadBatches(); }} />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <UnassignedUsersList refreshKey={refreshKey} />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <AssignInstitutePanel />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <AssignBranchPanel />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a" }}>
+              <div className="admin-panel">
                 <AssignDivisionPanel />
               </div>
             </div>
@@ -744,16 +622,22 @@ export default function AdminPage() {
           {/* ── USER MANAGEMENT TAB ── */}
           {activeTab === "users" && (
             <div style={{ maxWidth: "1000px" }}>
-              <h2 style={{ margin: "0 0 8px", color: "#f3f4f6" }}>👥 User Management & Requests</h2>
-              <p style={{ color: "#9ca3af", marginBottom: "24px", fontSize: "0.9em" }}>
-                Monitor pending role promotions, unassigned students, and group assignments.
-              </p>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">👥 User Management & Requests</h2>
+                <p className="admin-page-subtitle">
+                  Monitor pending role promotions, unassigned students, and group assignments.
+                </p>
+              </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <PendingRequestsQueue />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a" }}>
+              <div className="admin-panel">
+                <AssignMonitorPanel />
+              </div>
+
+              <div className="admin-panel">
                 <UnassignedUsersList refreshKey={refreshKey} />
               </div>
             </div>
@@ -762,21 +646,23 @@ export default function AdminPage() {
           {/* ── MODERATION TAB ── */}
           {activeTab === "moderation" && (
             <div style={{ maxWidth: "1000px" }}>
-              <h2 style={{ margin: "0 0 8px", color: "#f3f4f6" }}>🛡️ Moderation Tools</h2>
-              <p style={{ color: "#9ca3af", marginBottom: "24px", fontSize: "0.9em" }}>
-                Enforce community guidelines, manage temporary mutes, and review permanent bans.
-              </p>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">🛡️ Moderation Tools</h2>
+                <p className="admin-page-subtitle">
+                  Enforce community guidelines, manage temporary mutes, and review permanent bans.
+                </p>
+              </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <MutePanel />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: isGodAdmin ? "20px" : 0 }}>
+              <div className="admin-panel">
                 <BanPanel />
               </div>
 
               {isGodAdmin && (
-                <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a" }}>
+                <div className="admin-panel">
                   <BanAppealsPanel />
                 </div>
               )}
@@ -786,16 +672,18 @@ export default function AdminPage() {
           {/* ── REPORTS & HELP TAB ── */}
           {activeTab === "reports" && (
             <div style={{ maxWidth: "1000px" }}>
-              <h2 style={{ margin: "0 0 8px", color: "#f3f4f6" }}>🚩 Reports & Help Queue</h2>
-              <p style={{ color: "#9ca3af", marginBottom: "24px", fontSize: "0.9em" }}>
-                Review misconduct reports submitted by users and answer student help inquiries.
-              </p>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">🚩 Reports & Help Queue</h2>
+                <p className="admin-page-subtitle">
+                  Review misconduct reports submitted by users and answer student help inquiries.
+                </p>
+              </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a", marginBottom: "20px" }}>
+              <div className="admin-panel">
                 <ReportsQueue />
               </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a" }}>
+              <div className="admin-panel">
                 <HelpQueuePanel />
               </div>
             </div>
@@ -804,12 +692,14 @@ export default function AdminPage() {
           {/* ── SETTINGS & CANTEENS TAB ── */}
           {activeTab === "settings" && (
             <div style={{ maxWidth: "1000px" }}>
-              <h2 style={{ margin: "0 0 8px", color: "#f3f4f6" }}>🍽️ Campus Settings & Canteens</h2>
-              <p style={{ color: "#9ca3af", marginBottom: "24px", fontSize: "0.9em" }}>
-                Manage campus food spots and configure platform options.
-              </p>
+              <div className="admin-page-header">
+                <h2 className="admin-page-title">🍽️ Campus Settings & Canteens</h2>
+                <p className="admin-page-subtitle">
+                  Manage campus food spots and configure platform options.
+                </p>
+              </div>
 
-              <div style={{ backgroundColor: "#1f2028", padding: "20px", borderRadius: "10px", border: "1px solid #2e303a" }}>
+              <div className="admin-panel">
                 <CreateCanteenPanel />
               </div>
             </div>
@@ -817,74 +707,60 @@ export default function AdminPage() {
 
           {/* ── BATCHES & CHATS DRILL-DOWN TAB ── */}
           {activeTab === "batches" && (
-            <div style={{ display: "flex", height: "100%", width: "100%" }}>
+            <div className={`admin-batches-layout ${activeGroupId ? "has-active-chat" : ""}`} style={{ display: "flex", height: "100%", width: "100%" }}>
               {/* Batch / Group List Panel */}
-              <div style={{ width: "300px", borderRight: "1px solid #2e303a", backgroundColor: "#12131a", display: "flex", flexDirection: "column" }}>
+              <div className="admin-batch-sidebar">
                 {!selectedBatch ? (
                   <>
-                    <div style={{ padding: "16px", borderBottom: "1px solid #2e303a", fontWeight: "bold", color: "#f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div className="admin-batch-header">
                       <span>🎓 Batches & Groups</span>
-                      <span style={{ fontSize: "0.8em", color: "#9ca3af" }}>{sortedBatchItems.length} items</span>
+                      <span className="admin-batch-header-count">{sortedBatchItems.length} items</span>
                     </div>
-                    <div style={{ flex: 1, overflowY: "auto" }}>
+                    <div className="admin-batch-list">
                       {sortedBatchItems.length === 0 ? (
-                        <div style={{ padding: "24px", color: "#6b7280", textAlign: "center", fontSize: "0.9em" }}>
+                        <div className="admin-empty">
                           No batches or groups found.
                         </div>
                       ) : (
-                        sortedBatchItems.map((b) => {
-                          return (
-                            <div
-                              key={b._id}
-                              onClick={() => handleSelectBatch(b)}
-                              style={{
-                                padding: "14px 18px", borderBottom: "1px solid #232530",
-                                cursor: "pointer", transition: "background-color 0.15s"
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#1b1d28"}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ fontWeight: "600", color: "#f3f4f6", fontSize: "0.95em" }}>{b.label}</div>
-                                {b.unreadCount > 0 && (
-                                  <div style={{
-                                    backgroundColor: "#25D366", color: "white", borderRadius: "50%",
-                                    minWidth: "20px", height: "20px", display: "flex", alignItems: "center",
-                                    justifyContent: "center", fontSize: "0.75em", fontWeight: "bold",
-                                    padding: "0 4px", flexShrink: 0, marginLeft: "8px"
-                                  }}>
-                                    {b.unreadCount}
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ fontSize: "0.78em", color: "#9ca3af", marginTop: "3px" }}>
-                                {b.subLabel}
-                              </div>
+                        sortedBatchItems.map((b) => (
+                          <div
+                            key={b._id}
+                            onClick={() => handleSelectBatch(b)}
+                            className="admin-batch-item"
+                          >
+                            <div className="admin-batch-item-top">
+                              <div className="admin-batch-item-name">{b.label}</div>
+                              {b.unreadCount > 0 && (
+                                <div className="admin-unread-badge">
+                                  {b.unreadCount}
+                                </div>
+                              )}
                             </div>
-                          );
-                        })
+                            <div className="admin-batch-item-sub">
+                              {b.subLabel}
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   </>
                 ) : (
                   <>
-                    <div style={{ padding: "12px 16px", borderBottom: "1px solid #2e303a", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div className="admin-batch-header" style={{ gap: "10px" }}>
                       <button
                         onClick={() => { setSelectedBatch(null); setActiveGroupId(null); }}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer", fontSize: "1.1em", color: "#aa3bff", padding: 0
-                        }}
+                        className="admin-back-btn"
                       >
                         ←
                       </button>
-                      <div>
-                        <div style={{ fontWeight: "bold", color: "#f3f4f6", fontSize: "0.95em" }}>{selectedBatch.label}</div>
-                        <div style={{ fontSize: "0.75em", color: "#9ca3af" }}>{batchGroups.length} associated groups</div>
+                      <div style={{ flex: 1 }}>
+                        <div className="admin-batch-item-name">{selectedBatch.label}</div>
+                        <div style={{ fontSize: "10px", color: "var(--admin-text-3)" }}>{batchGroups.length} associated groups</div>
                       </div>
                     </div>
-                    <div style={{ flex: 1, overflowY: "auto" }}>
+                    <div className="admin-batch-list">
                       {batchGroups.length === 0 ? (
-                        <div style={{ padding: "20px", color: "#6b7280", textAlign: "center", fontSize: "0.85em" }}>
+                        <div className="admin-empty">
                           No groups found.
                         </div>
                       ) : (
@@ -895,47 +771,20 @@ export default function AdminPage() {
                             <div
                               key={g._id}
                               onClick={() => handleSelectBatchGroup(g)}
-                              style={{
-                                padding: "12px 16px", borderBottom: "1px solid #232530",
-                                backgroundColor: isSelected ? "#1f2238" : "transparent",
-                                borderLeft: isSelected ? "3px solid #aa3bff" : "3px solid transparent",
-                                cursor: "pointer",
-                                transition: "background-color 0.15s"
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = "#181a24";
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
-                              }}
+                              className={`admin-group-item ${isSelected ? "admin-group-item--active" : ""}`}
                             >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{
-                                  fontWeight: isSelected ? "bold" : "600",
-                                  color: isSelected ? "#aa3bff" : "#f3f4f6",
-                                  fontSize: "0.88em",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap"
-                                }}>
+                              <div className="admin-group-item-top">
+                                <span className={`admin-group-name ${isSelected ? "admin-group-name--active" : ""}`}>
                                   {g.name}
                                 </span>
                                 {unread > 0 && !isSelected && (
-                                  <div style={{
-                                    backgroundColor: "#25D366", color: "white", borderRadius: "50%",
-                                    minWidth: "20px", height: "20px", display: "flex", alignItems: "center",
-                                    justifyContent: "center", fontSize: "0.75em", fontWeight: "bold",
-                                    padding: "0 4px", flexShrink: 0, marginLeft: "8px"
-                                  }}>
+                                  <div className="admin-unread-badge">
                                     {unread}
                                   </div>
                                 )}
                               </div>
                               {g.lastMessageSnippet && (
-                                <div style={{
-                                  fontSize: "0.78em", color: "#9ca3af", marginTop: "4px",
-                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-                                }}>
+                                <div className="admin-group-snippet">
                                   {g.lastMessageSnippet}
                                 </div>
                               )}
@@ -949,14 +798,31 @@ export default function AdminPage() {
               </div>
 
               {/* Chat Window Panel */}
-              <div style={{ flex: 1, display: "flex", backgroundColor: "#16171d" }}>
-                <ChatWindow />
+              <div className="admin-chat-panel">
+                <ChatWindow onMobileBack={() => setActiveGroupId(null)} />
               </div>
             </div>
           )}
 
         </div>
       </div>
+
+      {/* ═══ ACTION NOTIFICATION TOAST ═══ */}
+      {actionNotification && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+          background: "var(--admin-surface)", border: "1px solid var(--admin-border)",
+          borderRadius: "var(--admin-r-sm)", boxShadow: "var(--admin-shadow-md)",
+          zIndex: 9999, animation: "slideUpFade 0.4s ease forwards"
+        }}>
+          <span style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--admin-text)" }}>{actionNotification}</span>
+          <button
+            onClick={() => setActionNotification(null)}
+            style={{ background: "none", border: "none", color: "var(--admin-text-3)", cursor: "pointer", fontSize: 14 }}
+          >✕</button>
+        </div>
+      )}
     </div>
   );
 }

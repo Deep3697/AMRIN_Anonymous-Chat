@@ -11,18 +11,24 @@ export default function PollView({ message }) {
   }
 
   return (
-    <div>
-      <p style={{ margin: "0 0 8px", fontWeight: "bold" }}>📊 {message.poll.question}</p>
+    <div className="poll-card">
+      <div className="poll-question">📊 {message.poll.question}</div>
       {message.poll.options.map((opt, i) => {
         const pct = totalVotes ? Math.round((opt.votes.length / totalVotes) * 100) : 0;
         const votedByMe = opt.votes.some((v) => String(v) === String(myId) || String(v?._id) === String(myId));
         return (
-          <div key={i} onClick={() => vote(i)} style={{
-            cursor: "pointer", padding: "8px", marginBottom: "6px", borderRadius: "6px",
-            border: votedByMe ? "2px solid #007bff" : "1px solid #ddd",
-            background: `linear-gradient(90deg, #e7f1ff ${pct}%, transparent ${pct}%)`,
-          }}>
-            {opt.text} — {opt.votes.length} vote{opt.votes.length !== 1 ? "s" : ""} ({pct}%)
+          <div
+            key={i}
+            className={`poll-option ${votedByMe ? "poll-option--voted" : ""}`}
+            onClick={() => vote(i)}
+          >
+            <div className="poll-option-fill" style={{ width: `${pct}%` }} />
+            <div className="poll-option-content">
+              <span className="poll-option-text">{opt.text}</span>
+              <span className="poll-option-stats">
+                {opt.votes.length} vote{opt.votes.length !== 1 ? "s" : ""} ({pct}%)
+              </span>
+            </div>
           </div>
         );
       })}

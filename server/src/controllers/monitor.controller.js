@@ -3,6 +3,7 @@ import { ActionRequest } from "../models/actionRequest.model.js";
 import { Membership } from "../models/membership.model.js";
 import { User } from "../models/user.model.js";
 import { writeAuditLog } from "../services/audit.service.js";
+import { getIO } from "../utils/socketIO.js";
 
 export async function assignMonitor(req, res) {
   const { userId, groupId } = req.body;
@@ -14,6 +15,15 @@ export async function assignMonitor(req, res) {
 
 export async function createActionRequest(req, res) {
   const { groupId, action, targetUserId } = req.body;
+
+  // Only admins or assigned monitors can create requests
+  if (req.user.role !== "god_admin" && req.user.role !== "main_admin") {
+    const isAssigned = await RoleAssignment.exists({ userId: req.user.sub, groupId, isActive: true });
+    if (!isAssigned) {
+      return res.status(403).json({ error: "You are not an assigned monitor for this group" });
+    }
+  }
+
   const request = await ActionRequest.create({
     requestedBy: req.user.sub,
     groupId,
@@ -36,9 +46,20 @@ export async function reviewActionRequest(req, res) {
 
   if (decision === "approved") {
     if (request.action === "add_member") {
-      await Membership.create({ userId: request.targetUserId, groupId: request.groupId }).catch(() => {});
+      await Membership.create({ userId: request.targetUserId, groupId: request.groupId }).catch(() => { });
+      const io = getIO();
+      const uid = request.targetUserId.toString();
+      const gid = request.groupId.toString();
+      io.to(uid).emit("user:readded", { userId: uid, groupId: gid });
     } else if (request.action === "remove_member" || request.action === "kick_member") {
       await Membership.deleteOne({ userId: request.targetUserId, groupId: request.groupId });
+      // Notify the kicked user in real-time
+      const io = getIO();
+      const uid = request.targetUserId.toString();
+      const gid = request.groupId.toString();
+      io.to(gid).emit("user:kicked", { userId: uid, groupId: gid });
+      io.to(uid).emit("user:kicked", { userId: uid, groupId: gid });
+      io.in(uid).socketsLeave(gid);
     } else if (request.action === "mute_user") {
       const minutes = req.body.muteDuration || 60;
       await User.findByIdAndUpdate(request.targetUserId, {

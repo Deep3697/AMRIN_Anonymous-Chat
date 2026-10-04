@@ -35,32 +35,20 @@ export default function ReportsQueue() {
 
   return (
     <div>
-      <h3>User Reports</h3>
+      <h3 className="admin-panel-title" style={{ marginBottom: "16px" }}>User Reports</h3>
 
-      {/* Filter tabs — "Admin Reports" tab only visible to God Admin */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+      {/* Filter tabs */}
+      <div className="admin-filter-tabs">
         <button
           onClick={() => setFilter("user")}
-          style={{
-            padding: "6px 16px", cursor: "pointer", borderRadius: "4px",
-            border: filter === "user" ? "2px solid #007bff" : "1px solid #ccc",
-            backgroundColor: filter === "user" ? "#e7f1ff" : "transparent",
-            fontWeight: filter === "user" ? "bold" : "normal",
-            color: filter === "user" ? "#007bff" : "#555",
-          }}
+          className={`admin-filter-tab ${filter === "user" ? "admin-filter-tab--active" : ""}`}
         >
           Member Reports
         </button>
         {isGodAdmin && (
           <button
             onClick={() => setFilter("admin")}
-            style={{
-              padding: "6px 16px", cursor: "pointer", borderRadius: "4px",
-              border: filter === "admin" ? "2px solid #dc3545" : "1px solid #ccc",
-              backgroundColor: filter === "admin" ? "#fce4ec" : "transparent",
-              fontWeight: filter === "admin" ? "bold" : "normal",
-              color: filter === "admin" ? "#dc3545" : "#555",
-            }}
+            className={`admin-filter-tab ${filter === "admin" ? "admin-filter-tab--danger-active" : ""}`}
           >
             ⚠️ Admin Reports
           </button>
@@ -68,36 +56,41 @@ export default function ReportsQueue() {
       </div>
 
       {reports.length === 0 ? (
-        <p style={{ color: "#888" }}>No pending {filter === "admin" ? "admin" : "member"} reports</p>
+        <p className="admin-empty">No pending {filter === "admin" ? "admin" : "member"} reports</p>
       ) : (
         <>
-          <p style={{ fontSize: "0.9em", color: "#666", marginBottom: "10px" }}>
+          <p style={{ fontSize: "11px", color: "var(--admin-text-3)", marginBottom: "14px" }}>
             {reports.length} pending {filter === "admin" ? "admin" : "member"} report{reports.length !== 1 ? "s" : ""}
           </p>
-          {reports.map((r) => (
+          {reports.map((r, idx) => (
             <div
               key={r._id}
-              style={{
-                border: filter === "admin" ? "1px solid #ef4444" : "1px solid #f59e0b",
-                borderRadius: "8px",
-                padding: "14px",
-                marginBottom: "12px",
-                backgroundColor: filter === "admin" ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)",
-              }}
+              className={`admin-report-card ${filter === "admin" ? "admin-report-card--danger" : "admin-report-card--warning"}`}
+              style={{ animationDelay: `${idx * 60}ms` }}
             >
-              <p style={{ margin: "0 0 6px", color: "#f3f4f6" }}>
-                <strong>{r.reportedBy?.anonymousName}</strong> reported{" "}
-                <strong style={{ color: "#ef4444" }}>
+              <p style={{ margin: "0 0 6px", color: "var(--admin-text)", fontSize: "12px" }}>
+                <strong style={{ color: "var(--admin-primary)" }}>{r.reportedBy?.anonymousName}</strong> reported{" "}
+                <strong style={{ color: "var(--admin-danger)" }}>
                   {r.reportedUser?.anonymousName}
                   {r.reportedUser?.role && ["main_admin", "god_admin"].includes(r.reportedUser.role) && (
-                    <span style={{ fontSize: "0.8em", color: "#f59e0b", marginLeft: "4px" }}>
-                      ({r.reportedUser.role === "god_admin" ? "God Admin" : "Admin"})
+                    <span style={{
+                      fontSize: "9px",
+                      marginLeft: "4px",
+                      padding: "2px 8px",
+                      borderRadius: "var(--admin-r-pill)",
+                      background: "var(--admin-warning-soft)",
+                      color: "var(--admin-warning)",
+                      fontWeight: "700"
+                    }}>
+                      {r.reportedUser.role === "god_admin" ? "God Admin" : "Admin"}
                     </span>
                   )}
                 </strong>
-                {r.groupId?.name && <> in <em style={{ color: "#a855f7" }}>{r.groupId.name}</em></>}
+                {r.groupId?.name && <> in <em style={{ color: "var(--admin-accent)" }}>{r.groupId.name}</em></>}
               </p>
-              <p style={{ margin: "0 0 10px", color: "#cbd5e1" }}>Reason: "{r.reason}"</p>
+              <p style={{ margin: "0 0 12px", color: "var(--admin-text-2)", fontSize: "11px" }}>
+                Reason: "{r.reason}"
+              </p>
 
               <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                 {filter === "admin" ? (
@@ -105,38 +98,35 @@ export default function ReportsQueue() {
                     <select
                       value={muteDurations[r._id] || 60}
                       onChange={(e) => setMuteDurations((p) => ({ ...p, [r._id]: Number(e.target.value) }))}
-                      style={{ padding: "4px 8px", borderRadius: "4px", border: "1px solid #ccc" }}
                     >
                       {MUTE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label.replace("hours", "hours").replace("hour", "hour")}</option>
+                        <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
                     <button
                       onClick={() => handleReview(r._id, "demoted_temp")}
-                      style={{ padding: "5px 12px", backgroundColor: "#ffc107", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+                      className="admin-btn admin-btn--warning admin-btn--sm"
                     >
                       Demote for hours
                     </button>
                     <button
                       onClick={() => handleReview(r._id, "demoted_perm")}
-                      style={{ padding: "5px 12px", backgroundColor: "#dc3545", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+                      className="admin-btn admin-btn--danger admin-btn--sm"
                     >
                       Permanently Demote
                     </button>
                     <button
                       onClick={() => handleReview(r._id, "dismissed")}
-                      style={{ padding: "5px 12px", backgroundColor: "#6c757d", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}
+                      className="admin-btn admin-btn--ghost admin-btn--sm"
                     >
                       Dismiss
                     </button>
                   </>
                 ) : (
                   <>
-                    {/* Mute with duration selector */}
                     <select
                       value={muteDurations[r._id] || 60}
                       onChange={(e) => setMuteDurations((p) => ({ ...p, [r._id]: Number(e.target.value) }))}
-                      style={{ padding: "4px 8px", borderRadius: "4px", border: "1px solid #ccc" }}
                     >
                       {MUTE_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
@@ -144,19 +134,19 @@ export default function ReportsQueue() {
                     </select>
                     <button
                       onClick={() => handleReview(r._id, "muted")}
-                      style={{ padding: "5px 12px", backgroundColor: "#ffc107", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+                      className="admin-btn admin-btn--warning admin-btn--sm"
                     >
                       Mute
                     </button>
                     <button
                       onClick={() => handleReview(r._id, "kicked")}
-                      style={{ padding: "5px 12px", backgroundColor: "#dc3545", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+                      className="admin-btn admin-btn--danger admin-btn--sm"
                     >
                       Kick
                     </button>
                     <button
                       onClick={() => handleReview(r._id, "dismissed")}
-                      style={{ padding: "5px 12px", backgroundColor: "#6c757d", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}
+                      className="admin-btn admin-btn--ghost admin-btn--sm"
                     >
                       Dismiss
                     </button>

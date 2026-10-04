@@ -3,6 +3,7 @@ import { Group } from "../models/group.model.js";
 import { User } from "../models/user.model.js";
 import { Membership } from "../models/membership.model.js";
 import { writeAuditLog } from "../services/audit.service.js";
+import { getIO } from "../utils/socketIO.js";
 
 // ─── Helper: group type config ──────────────────────────────────────
 const FOUR_GROUP_TYPES = ["casual", "doubt", "opportunity", "promotion"];
@@ -54,6 +55,17 @@ async function joinUserToGroups(userId, groupQuery) {
         type: "system",
       }));
       await Message.insertMany(systemMessages).catch(() => {});
+
+      // Notify the user in real-time that they've been added to these groups
+      try {
+        const io = getIO();
+        const uid = userId.toString();
+        groups.forEach((g) => {
+          io.to(uid).emit("user:readded", { userId: uid, groupId: g._id.toString() });
+        });
+      } catch (err) {
+        console.error("Failed to emit user:readded", err);
+      }
     }
   }
 }

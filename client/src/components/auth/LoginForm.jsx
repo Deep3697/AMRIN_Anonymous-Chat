@@ -246,7 +246,7 @@ export default function LoginForm() {
                   </div>
                   <span className="auth-remember-label">Remember me</span>
                 </label>
-                <button type="button" className="auth-forgot" onClick={() => {}}>
+                <button type="button" className="auth-forgot" onClick={() => navigate("/forgot-password")}>
                   Forgot password?
                 </button>
               </div>

@@ -2,6 +2,7 @@ import { Report } from "../models/report.model.js";
 import { User } from "../models/user.model.js";
 import { Membership } from "../models/membership.model.js";
 import { writeAuditLog } from "../services/audit.service.js";
+import { getIO } from "../utils/socketIO.js";
 
 // Any authenticated user can report someone (1 per user per group per day)
 // Admins (god_admin, main_admin) cannot use the report feature
@@ -101,6 +102,13 @@ export async function reviewReport(req, res) {
       });
     } else if (action === "kicked") {
       await Membership.deleteOne({ userId: report.reportedUser, groupId: report.groupId });
+      // Notify the kicked user in real-time
+      const io = getIO();
+      const uid = report.reportedUser.toString();
+      const gid = report.groupId.toString();
+      io.to(gid).emit("user:kicked", { userId: uid, groupId: gid });
+      io.to(uid).emit("user:kicked", { userId: uid, groupId: gid });
+      io.in(uid).socketsLeave(gid);
     } else if (action === "demoted_temp") {
       const minutes = muteDuration || 60;
       const u = await User.findById(report.reportedUser);

@@ -1,8 +1,10 @@
 // client/src/components/chat/MessageBubble.jsx
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import socket from "../../socket/socketClient";
 import axiosClient from "../../api/axiosClient";
-import { submitReport } from "../../api/admin.api";
+import { submitReport, createMonitorRequest } from "../../api/admin.api";
 import { startConversation } from "../../api/conversation.api";
 import { useChatStore } from "../../store/chatStore";
 import PollView from "./PollView";
@@ -13,23 +15,23 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
-export default function MessageBubble({ message, isOwnMessage, userRole, threadType }) {
+export default function MessageBubble({ message, isOwnMessage, userRole, threadType, blockedList = [], isSenderKicked, onUserAdded }) {
   const ref = useRef();
+  const navigate = useNavigate();
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
+  const [contextPos, setContextPos] = useState({ top: 0, left: 0, right: null });
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [showUserPopup, setShowUserPopup] = useState(false);
   const [userPopupPos, setUserPopupPos] = useState({ x: 0, y: 0 });
 
-  // Custom Modal State
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInput, setModalInput] = useState("");
-  const [seenByViewers, setSeenByViewers] = useState(null); // null = hidden, [] = loading/empty, [...] = loaded
+  const [seenByViewers, setSeenByViewers] = useState(null);
 
   const setActiveGroupId = useChatStore((s) => s.setActiveGroupId);
-
   const isDM = threadType === "dm";
+  const isUserBlocked = blockedList.includes(String(message.senderId));
 
   useEffect(() => {
     if (!isOwnMessage && message._id && !message.isOptimistic && !String(message._id).startsWith("temp_")) {
@@ -37,23 +39,35 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     }
   }, [message._id, isOwnMessage, message.isOptimistic]);
 
-  // Close context menu on click anywhere
   useEffect(() => {
-    function handleClickOutside() {
-      setShowContextMenu(false);
-      setShowUserPopup(false);
-    }
+    function handleClickOutside() { setShowContextMenu(false); setShowUserPopup(false); }
+    function handleCloseAllMenus() { setShowContextMenu(false); setShowUserPopup(false); }
     if (showContextMenu || showUserPopup) {
       document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
+      document.addEventListener("close-all-context-menus", handleCloseAllMenus);
+      return () => {
+        document.removeEventListener("click", handleClickOutside);
+        document.removeEventListener("close-all-context-menus", handleCloseAllMenus);
+      };
     }
   }, [showContextMenu, showUserPopup]);
 
   function handleContextMenu(e) {
     e.preventDefault();
     if (message.isOptimistic || message.isDeleted) return;
-    setShowContextMenu(true);
-    setContextPos({ x: e.clientX, y: e.clientY });
+
+    // Close all other context menus first
+    document.dispatchEvent(new Event("close-all-context-menus"));
+
+    // Position fixed to the viewport to avoid clipping by overflow:hidden containers
+    if (isOwnMessage) {
+      setContextPos({ top: e.clientY, right: window.innerWidth - e.clientX, left: null });
+    } else {
+      setContextPos({ top: e.clientY, left: e.clientX, right: null });
+    }
+
+    // Small delay to let close event propagate before opening this menu
+    setTimeout(() => setShowContextMenu(true), 0);
   }
 
   function handleStartEdit(e) {
@@ -85,12 +99,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   function handleDelete(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Delete Message",
-      message: "Are you sure you want to delete this message?",
-      onConfirm: () => {
-        socket.emit("message:delete", { messageId: message._id });
-      }
+      type: "confirm", title: "Delete Message", message: "Are you sure you want to delete this message?",
+      onConfirm: () => { socket.emit("message:delete", { messageId: message._id }); }
     });
     setShowContextMenu(false);
   }
@@ -99,21 +109,16 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalInput("");
     setModalConfig({
-      type: "prompt",
-      title: `Report ${message.anonymousNameSnapshot}`,
+      type: "prompt", title: `Report ${message.anonymousNameSnapshot}`,
       message: `Report this message:\n"${message.text}"`,
       placeholder: "Enter a reason...",
       onConfirm: async (reason) => {
         if (!reason?.trim()) return;
         try {
           await submitReport(message.senderId, message.threadId, reason);
-          setTimeout(() => {
-            setModalConfig({ type: "alert", title: "Success", message: "Report submitted successfully." });
-          }, 100);
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Success", message: "Report submitted successfully." }); }, 100);
         } catch (err) {
-          setTimeout(() => {
-            setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to submit report" });
-          }, 100);
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to submit report" }); }, 100);
         }
       }
     });
@@ -123,12 +128,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   function handleMute(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Mute User",
-      message: `Mute ${message.anonymousNameSnapshot} for 24 hours?`,
-      onConfirm: () => {
-        socket.emit("user:mute", { userId: message.senderId, groupId: message.threadId, durationMinutes: 1440 });
-      }
+      type: "confirm", title: "Mute User", message: `Mute ${message.anonymousNameSnapshot} for 24 hours?`,
+      onConfirm: () => { socket.emit("user:mute", { userId: message.senderId, groupId: message.threadId, durationMinutes: 1440 }); }
     });
     setShowContextMenu(false);
   }
@@ -136,26 +137,59 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   function handleKick(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Kick User",
-      message: `Are you sure you want to kick ${message.anonymousNameSnapshot} from this group?`,
-      onConfirm: () => {
-        socket.emit("user:kick", { userId: message.senderId, groupId: message.threadId });
+      type: "confirm", title: "Kick User", message: `Are you sure you want to kick ${message.anonymousNameSnapshot} from this group?`,
+      onConfirm: () => { socket.emit("user:kick", { userId: message.senderId, groupId: message.threadId }); }
+    });
+    setShowContextMenu(false);
+  }
+
+  function handleRequestKick(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setModalConfig({
+      type: "confirm", title: "Request Kick", message: `Request admin to kick ${message.anonymousNameSnapshot} from this group?`,
+      onConfirm: async () => {
+        try {
+          await createMonitorRequest(message.threadId, "kick_member", message.senderId);
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Requested", message: "Kick request sent to admin for approval." }); }, 100);
+        } catch (err) {
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to submit request" }); }, 100);
+        }
       }
     });
     setShowContextMenu(false);
   }
 
-  // Block user in DM
+  function handleRequestAdd(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setModalConfig({
+      type: "confirm", title: "Request Add", message: `Request admin to re-add ${message.anonymousNameSnapshot} to this group?`,
+      onConfirm: async () => {
+        try {
+          await createMonitorRequest(message.threadId, "add_member", message.senderId);
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Requested", message: "Add request sent to admin for approval." }); }, 100);
+        } catch (err) {
+          setTimeout(() => { setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to submit request" }); }, 100);
+        }
+      }
+    });
+    setShowContextMenu(false);
+  }
+
+  function handleAddUser(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    socket.emit("user:add", { userId: message.senderId, groupId: message.threadId });
+    if (onUserAdded) onUserAdded(message.senderId);
+    setShowContextMenu(false);
+  }
+
   function handleBlockUser(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Block User",
-      message: `Block ${message.anonymousNameSnapshot}? They won't be able to message you anymore.`,
+      type: "confirm", title: "Block User", message: `Block ${message.anonymousNameSnapshot}? They won't be able to message you anymore.`,
       onConfirm: async () => {
         try {
           await axiosClient.post("/block", { blockedId: message.senderId });
+          window.dispatchEvent(new Event("user-blocked"));
           setModalConfig({ type: "alert", title: "Blocked", message: `${message.anonymousNameSnapshot} has been blocked.` });
         } catch (err) {
           setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to block user" });
@@ -165,14 +199,31 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     setShowContextMenu(false);
   }
 
-  // Click on sender name → popup with DM / Report options
+  function handleUnblockUser(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setModalConfig({
+      type: "confirm", title: "Unblock User", message: `Unblock ${message.anonymousNameSnapshot}? They will be able to message you again.`,
+      onConfirm: async () => {
+        try {
+          await axiosClient.delete(`/block/${message.senderId}`);
+          window.dispatchEvent(new Event("user-blocked"));
+          setModalConfig({ type: "alert", title: "Unblocked", message: `${message.anonymousNameSnapshot} has been unblocked.` });
+        } catch (err) {
+          setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to unblock user" });
+        }
+      }
+    });
+    setShowContextMenu(false);
+  }
+
   function handleNameClick(e) {
     e.stopPropagation();
-    if (isOwnMessage || message.isOptimistic) return;
-    // In DMs, no name-click popup needed (you already know who they are)
-    if (isDM) return;
-    setShowUserPopup(true);
-    setUserPopupPos({ x: e.clientX, y: e.clientY });
+    if (isOwnMessage || message.isOptimistic || isDM) return;
+    document.dispatchEvent(new Event("close-all-context-menus"));
+    setTimeout(() => {
+      setShowUserPopup(true);
+      setUserPopupPos({ x: e.clientX, y: e.clientY });
+    }, 0);
   }
 
   async function handleDMFromPopup(e) {
@@ -180,8 +231,17 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     try {
       const res = await startConversation(message.senderId);
       const convo = res.data.conversation;
+      
+      // Dispatch event before setActiveGroupId so the Sidebar changes tab and doesn't auto-clear
+      window.dispatchEvent(new Event("switch-to-dms"));
+      
       setActiveGroupId(convo._id, "dm", convo.otherParticipantName || message.anonymousNameSnapshot);
       setShowUserPopup(false);
+      
+      // If we are currently on the admin dashboard, redirect to the chat page
+      if (window.location.pathname.startsWith("/admin")) {
+        navigate("/chat");
+      }
     } catch (err) {
       setModalConfig({ type: "alert", title: "Error", message: err.response?.data?.error || "Failed to start DM" });
     }
@@ -196,12 +256,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   function handlePromote(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Promote to Monitor",
-      message: `Promote ${message.anonymousNameSnapshot} to Chat Monitor?`,
-      onConfirm: () => {
-        socket.emit("user:promote", { userId: message.senderId, groupId: message.threadId });
-      }
+      type: "confirm", title: "Promote to Monitor", message: `Promote ${message.anonymousNameSnapshot} to Chat Monitor?`,
+      onConfirm: () => { socket.emit("user:promote", { userId: message.senderId, groupId: message.threadId }); }
     });
     setShowUserPopup(false);
   }
@@ -209,12 +265,8 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   function handleDemote(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setModalConfig({
-      type: "confirm",
-      title: "Demote to Member",
-      message: `Demote ${message.anonymousNameSnapshot} back to Member?`,
-      onConfirm: () => {
-        socket.emit("user:demote", { userId: message.senderId, groupId: message.threadId });
-      }
+      type: "confirm", title: "Demote to Member", message: `Demote ${message.anonymousNameSnapshot} back to Member?`,
+      onConfirm: () => { socket.emit("user:demote", { userId: message.senderId, groupId: message.threadId }); }
     });
     setShowUserPopup(false);
   }
@@ -225,364 +277,280 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     try {
       const res = await axiosClient.get(`/messages/${message._id}/seen-by`);
       setSeenByViewers(res.data.viewers || []);
-    } catch {
-      setSeenByViewers([]);
-    }
+    } catch { setSeenByViewers([]); }
   }
 
+  const isGodAdmin = userRole === "god_admin";
   const isAdmin = ["god_admin", "main_admin"].includes(userRole);
   const isMonitor = userRole === "chat_monitor";
   const canEdit = isOwnMessage && !message.isOptimistic && (Date.now() - new Date(message.createdAt).getTime() < 5 * 60 * 1000);
-
   const isTargetMonitor = message.anonymousNameSnapshot?.endsWith("(monitor)");
   const isTargetAdmin = message.anonymousNameSnapshot === "Admin" || message.anonymousNameSnapshot === "God_Admin";
 
-  // Seen label: DM shows "Seen" / "Not Seen", group shows "Seen by N"
   function renderSeenLabel() {
     if (!isOwnMessage) return null;
     if (isDM) {
       const seenCount = message.seenBy?.length || 0;
       return seenCount > 0
-        ? <span style={{ fontSize: "0.75em", color: "#28a745" }}>✓✓ Seen</span>
-        : <span style={{ fontSize: "0.75em", color: "#999" }}>✓ Not Seen</span>;
+        ? <span className="msg-seen-tag">✓✓ Seen</span>
+        : <span className="msg-unseen-tag">✓ Sent</span>;
     }
-    return null; // Group chat read receipts are only shown in the options menu
+    return null;
   }
 
   return (
     <div ref={ref} style={{ position: "relative" }} onContextMenu={handleContextMenu}>
+
+      {/* ─── System message ─── */}
       {message.type === "system" ? (
-        <div style={{
-          textAlign: "center", padding: "6px 0",
-          fontSize: "0.8em", color: "#888", fontStyle: "italic"
-        }}>
-          <span style={{
-            backgroundColor: "#f0f0f0", padding: "3px 12px", borderRadius: "10px",
-            display: "inline-block"
-          }}>
-            {message.text}
-          </span>
+        <div className="msg-system">
+          <span className="msg-system-text">{message.text}</span>
         </div>
+
+      /* ─── Deleted ─── */
       ) : message.isDeleted ? (
-        <em style={{ color: "#888" }}>This message was deleted{message.deletedBySnapshot ? ` by ${message.deletedBySnapshot}` : ""}</em>
+        <em className="msg-deleted">
+          This message was deleted{message.deletedBySnapshot ? ` by ${message.deletedBySnapshot}` : ""}
+        </em>
+
+      /* ─── Poll ─── */
       ) : message.type === "poll" ? (
-        <PollView message={message} />
+        <>
+          <div className="msg-text-content" style={{ marginBottom: "4px" }}>
+            <span
+              className="msg-sender-name"
+              onClick={handleNameClick}
+              style={{ cursor: (isOwnMessage || isDM) ? "default" : "pointer" }}
+            >
+              {message.anonymousNameSnapshot}:
+            </span>
+          </div>
+          <PollView message={message} />
+        </>
+
+      /* ─── Normal message ─── */
       ) : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            {isEditing ? (
-              <div style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveEdit(e); if (e.key === "Escape") handleCancelEdit(e); }}
-                  autoFocus
-                  style={{
-                    width: "100%", padding: "6px 10px", borderRadius: "4px",
-                    border: "1px solid #007bff", fontSize: "0.95em", outline: "none"
-                  }}
-                />
-                <div style={{ marginTop: "4px", display: "flex", gap: "6px" }}>
-                  <button type="button" onClick={handleSaveEdit} style={editBtnStyle}>Save</button>
-                  <button type="button" onClick={handleCancelEdit} style={{ ...editBtnStyle, backgroundColor: "#6c757d" }}>Cancel</button>
-                </div>
+          {isEditing ? (
+            <div>
+              <input
+                type="text" value={editText} autoFocus
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveEdit(e); if (e.key === "Escape") handleCancelEdit(e); }}
+                className="msg-edit-input"
+              />
+              <div style={{ marginTop: 4, display: "flex", gap: 5 }}>
+                <button type="button" onClick={handleSaveEdit} className="msg-edit-btn">Save</button>
+                <button type="button" onClick={handleCancelEdit} className="msg-edit-btn msg-edit-btn--cancel">Cancel</button>
               </div>
-            ) : (
-              <p style={{ margin: "0 0 2px 0", lineHeight: "1.4" }}>
-                <strong
-                  onClick={handleNameClick}
-                  style={{
-                    cursor: (isOwnMessage || isDM) ? "default" : "pointer",
-                    textDecoration: (isOwnMessage || isDM) ? "none" : "underline",
-                    textDecorationStyle: "dotted",
-                  }}
-                >
-                  {message.anonymousNameSnapshot}:
-                </strong>{" "}
-                {message.text}
-              </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="msg-text-content">
+              <span
+                className="msg-sender-name"
+                onClick={handleNameClick}
+                style={{ cursor: (isOwnMessage || isDM) ? "default" : "pointer" }}
+              >
+                {message.anonymousNameSnapshot}:
+              </span>{" "}
+              {message.text}
+            </div>
+          )}
 
           {/* Attachments */}
           {message.attachment && (
-            <div style={{ marginTop: "6px", marginBottom: "6px" }}>
+            <div className="msg-attachment">
               {message.attachment.type === "image" && (
-                <img
-                  src={message.attachment.url}
-                  alt="Attachment"
-                  style={{ maxWidth: "260px", maxHeight: "260px", borderRadius: "6px", display: "block" }}
-                />
+                <img src={message.attachment.url} alt="Attachment" />
               )}
               {message.attachment.type === "video" && (
-                <video src={message.attachment.url} controls style={{ maxWidth: "260px", borderRadius: "6px" }} />
+                <video src={message.attachment.url} controls />
               )}
               {message.attachment.type === "audio" && (
-                <audio src={message.attachment.url} controls style={{ display: "block", marginTop: "4px" }} />
+                <audio src={message.attachment.url} controls style={{ display: "block", marginTop: 4 }} />
               )}
               {message.attachment.type === "file" && (
-                <a href={message.attachment.url} target="_blank" rel="noreferrer" style={{ display: "block", padding: "8px 12px", backgroundColor: "#f0f0f0", borderRadius: "6px", textDecoration: "none", color: "#333" }}>
+                <a href={message.attachment.url} target="_blank" rel="noreferrer" className="msg-attachment-file">
                   📄 {message.attachment.fileName || "Download file"}
                 </a>
               )}
               {message.attachment.caption && (
-                <p style={{ fontSize: "0.9em", color: "#555", marginTop: "4px" }}>{message.attachment.caption}</p>
+                <p style={{ fontSize: "10px", color: "var(--text-3)", marginTop: 4 }}>{message.attachment.caption}</p>
               )}
             </div>
           )}
 
-          {/* Timestamp + Seen status row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: isOwnMessage ? "flex-end" : "flex-start", gap: "6px", marginTop: "2px" }}>
-            {message.isEdited && <span style={{ fontSize: "0.7em", color: "#999", fontStyle: "italic" }}>edited</span>}
-            <span style={{ fontSize: "0.7em", color: "#999" }}>
-              {formatTime(message.createdAt)}
-            </span>
+          {/* Meta row: time + seen */}
+          <div className="msg-meta">
+            {message.isEdited && <span className="msg-edited-tag">edited</span>}
+            <span>{formatTime(message.createdAt)}</span>
             {renderSeenLabel()}
           </div>
         </>
       )}
 
-      {/* Right-click context menu */}
-      {showContextMenu && (
-        <div style={{
-          position: "fixed", left: contextPos.x, top: contextPos.y,
-          backgroundColor: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-          border: "1px solid #e0e0e0", borderRadius: "8px", zIndex: 9999,
-          minWidth: "160px", overflow: "hidden", animation: "fadeIn 0.1s ease"
-        }}>
+      {/* ─── RIGHT-CLICK CONTEXT MENU (positioned near the message) ─── */}
+      {showContextMenu && createPortal(
+        <div
+          className="ctx-menu"
+          style={{
+            position: "fixed",
+            top: contextPos.top,
+            left: contextPos.left != null ? contextPos.left : undefined,
+            right: contextPos.right != null ? contextPos.right : undefined,
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => { e.preventDefault(); setShowContextMenu(false); }}
+        >
           {isDM ? (
-            /* ── DM Context Menu: No privileges, equal for all ── */
-            <>
-              {isOwnMessage ? (
-                <>
-                  {canEdit && (
-                    <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
-                  )}
-                  <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
-                  <div style={{ ...menuBtnStyle, cursor: "default" }}>
-                    {(message.seenBy?.length || 0) > 0
-                      ? <span style={{ color: "#28a745" }}>✓✓ Seen</span>
-                      : <span style={{ color: "#999" }}>✓ Not Seen</span>
-                    }
-                  </div>
-                </>
+            /* ── DM Context Menu ── */
+            isOwnMessage ? (
+              <>
+                {canEdit && <button type="button" onClick={handleStartEdit} className="ctx-menu-item">Edit</button>}
+                <button type="button" onClick={handleDelete} className="ctx-menu-item">Delete</button>
+                <div className="ctx-menu-item ctx-menu-item--info">
+                  {(message.seenBy?.length || 0) > 0
+                    ? <span className="msg-seen-tag">✓✓ Seen</span>
+                    : <span className="msg-unseen-tag">✓ Not Seen</span>
+                  }
+                </div>
+              </>
+            ) : (
+              isUserBlocked ? (
+                <button type="button" onClick={handleUnblockUser} className="ctx-menu-item">Unblock User</button>
               ) : (
-                <>
-                  <button type="button" onClick={handleBlockUser} style={{ ...menuBtnStyle, color: "#dc3545" }}>🚫 Block User</button>
-                </>
-              )}
-            </>
+                <button type="button" onClick={handleBlockUser} className="ctx-menu-item ctx-menu-item--danger">Block User</button>
+              )
+            )
           ) : (
-            /* ── Group Context Menu: Full privileges based on role ── */
+            /* ── Group Context Menu ── */
             <>
-              {/* Own message actions */}
               {isOwnMessage && (
                 <>
-                  {canEdit && (
-                    <button type="button" onClick={handleStartEdit} style={menuBtnStyle}>✏️ Edit</button>
-                  )}
-                  <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete</button>
-                  <button type="button" onClick={handleShowSeenBy} style={menuBtnStyle}>👁️ Seen by {message.seenBy?.length || 0}</button>
+                  {canEdit && <button type="button" onClick={handleStartEdit} className="ctx-menu-item">Edit</button>}
+                  <button type="button" onClick={handleDelete} className="ctx-menu-item">Delete</button>
+                  <button type="button" onClick={handleShowSeenBy} className="ctx-menu-item">Seen by {message.seenBy?.length || 0}</button>
                 </>
               )}
-
-              {/* Other's message actions */}
               {!isOwnMessage && (
                 <>
-                  {/* Report: visible for members and chat_monitors, NOT for admins */}
-                  {!isAdmin && (
-                    <button type="button" onClick={handleReport} style={menuBtnStyle}>🚩 Report</button>
-                  )}
-
-                  {/* Admin/Monitor moderation tools */}
+                  {!isAdmin && <button type="button" onClick={handleReport} className="ctx-menu-item">Report</button>}
                   {(isAdmin || isMonitor) && (
                     <>
-                      <button type="button" onClick={handleDelete} style={menuBtnStyle}>🗑️ Delete Msg</button>
-                      <button type="button" onClick={handleMute} style={menuBtnStyle}>🔇 Mute 24h</button>
+                      <button type="button" onClick={handleDelete} className="ctx-menu-item">Delete Msg</button>
+                      <button type="button" onClick={handleMute} className="ctx-menu-item">Mute 24h</button>
                     </>
                   )}
                   {isAdmin && (
-                    <button type="button" onClick={handleKick} style={{ ...menuBtnStyle, color: "#dc3545" }}>🥾 Kick User</button>
+                    isSenderKicked ? (
+                      <button type="button" onClick={handleAddUser} className="ctx-menu-item">Add User</button>
+                    ) : (
+                      <button type="button" onClick={handleKick} className="ctx-menu-item ctx-menu-item--danger">Kick User</button>
+                    )
+                  )}
+                  {isMonitor && !isAdmin && (
+                    isSenderKicked ? (
+                      <button type="button" onClick={handleRequestAdd} className="ctx-menu-item">Request Add</button>
+                    ) : (
+                      <button type="button" onClick={handleRequestKick} className="ctx-menu-item ctx-menu-item--danger">Request Kick</button>
+                    )
                   )}
                 </>
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Username click popup: DM / Report (only for group chats) */}
-      {showUserPopup && !isDM && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "fixed", left: userPopupPos.x, top: userPopupPos.y,
-            backgroundColor: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            border: "1px solid #e0e0e0", borderRadius: "8px", zIndex: 9999,
-            minWidth: "150px", overflow: "hidden"
-          }}
-        >
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid #eee", fontWeight: "bold", fontSize: "0.85em", color: "#333" }}>
-            {message.anonymousNameSnapshot}
-          </div>
-          <button type="button" onClick={handleDMFromPopup} style={menuBtnStyle}>💬 Send DM</button>
-          {!isAdmin && (
-            <button type="button" onClick={handleReportFromPopup} style={menuBtnStyle}>🚩 Report User</button>
+      {/* ─── Name Click Popup ─── */}
+      {showUserPopup && !isDM && createPortal(
+        <div className="user-popup" style={{ position: "fixed", left: userPopupPos.x, top: userPopupPos.y }} onClick={(e) => e.stopPropagation()}>
+          <div className="user-popup-header">{message.anonymousNameSnapshot}</div>
+          <button type="button" onClick={handleDMFromPopup} className="ctx-menu-item">Send DM</button>
+          {!isAdmin && <button type="button" onClick={handleReportFromPopup} className="ctx-menu-item">Report User</button>}
+          {isGodAdmin && !isTargetAdmin && (
+            isTargetMonitor
+              ? <button type="button" onClick={handleDemote} className="ctx-menu-item">Demote to Member</button>
+              : <button type="button" onClick={handlePromote} className="ctx-menu-item">Promote to Monitor</button>
           )}
-          {isAdmin && !isTargetAdmin && (
-            isTargetMonitor ? (
-              <button type="button" onClick={handleDemote} style={menuBtnStyle}>⬇️ Demote to Member</button>
-            ) : (
-              <button type="button" onClick={handlePromote} style={menuBtnStyle}>⬆️ Promote to Monitor</button>
-            )
-          )}
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Custom Modal for Alerts/Confirms/Prompts */}
-      {modalConfig && (
-        <div
-          onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
-            justifyContent: "center", alignItems: "center", zIndex: 10000
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white", padding: "20px", borderRadius: "8px",
-              width: "320px", boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-            }}
-          >
-            <h4 style={{ margin: "0 0 10px", color: "#333" }}>{modalConfig.title}</h4>
-            {modalConfig.message && (
-              <p style={{ margin: "0 0 16px", fontSize: "0.9em", color: "#555", whiteSpace: "pre-wrap" }}>
-                {modalConfig.message}
-              </p>
-            )}
-
-            {modalConfig.type === "prompt" && (
-              <input
-                autoFocus
-                type="text"
-                placeholder={modalConfig.placeholder}
-                value={modalInput}
-                onChange={(e) => setModalInput(e.target.value)}
-                style={{
-                  width: "100%", padding: "8px", marginBottom: "16px", boxSizing: "border-box",
-                  borderRadius: "4px", border: "1px solid #ccc", outline: "none"
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    modalConfig.onConfirm(modalInput);
+      {/* ─── Modal (Alert / Confirm / Prompt) ─── */}
+      {modalConfig && createPortal(
+        <div className="modal-overlay" onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}>
+          <div className="modal-backdrop" />
+          <div className="modal-card" style={{ width: 340 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-title">{modalConfig.title}</div>
+              {modalConfig.message && (
+                <p className="modal-subtitle" style={{ whiteSpace: "pre-wrap" }}>{modalConfig.message}</p>
+              )}
+              {modalConfig.type === "prompt" && (
+                <input
+                  autoFocus type="text" className="modal-input"
+                  placeholder={modalConfig.placeholder} value={modalInput}
+                  onChange={(e) => setModalInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); modalConfig.onConfirm(modalInput); setModalConfig(null); }
+                  }}
+                />
+              )}
+              <div className="modal-btn-row">
+                {(modalConfig.type === "confirm" || modalConfig.type === "prompt") && (
+                  <button type="button" className="modal-btn" onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}>Cancel</button>
+                )}
+                <button type="button" className="modal-btn modal-btn--primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (modalConfig.type === "prompt") modalConfig.onConfirm(modalInput || "");
+                    else if (modalConfig.onConfirm) modalConfig.onConfirm();
                     setModalConfig(null);
-                  }
-                }}
-              />
-            )}
-
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              {(modalConfig.type === "confirm" || modalConfig.type === "prompt") && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setModalConfig(null); }}
-                  style={{ padding: "6px 12px", border: "none", borderRadius: "4px", cursor: "pointer", backgroundColor: "#e2e6ea", color: "#333", fontWeight: "bold" }}
+                  }}
                 >
-                  Cancel
+                  {modalConfig.type === "alert" ? "OK" : "Submit"}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (modalConfig.type === "prompt") {
-                    modalConfig.onConfirm(modalInput || "");
-                  } else if (modalConfig.onConfirm) {
-                    modalConfig.onConfirm();
-                  }
-                  setModalConfig(null);
-                }}
-                style={{ padding: "6px 12px", border: "none", borderRadius: "4px", cursor: "pointer", backgroundColor: "#007bff", color: "white", fontWeight: "bold" }}
-              >
-                {modalConfig.type === "alert" ? "OK" : "Submit"}
-              </button>
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Seen By Viewer List Modal */}
-      {seenByViewers !== null && (
-        <div
-          onClick={() => setSeenByViewers(null)}
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
-            justifyContent: "center", alignItems: "center", zIndex: 10001
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: "white", padding: "0", borderRadius: "10px",
-              width: "300px", boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-              maxHeight: "400px", overflow: "hidden", display: "flex", flexDirection: "column"
-            }}
-          >
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "14px 18px", borderBottom: "1px solid #eee"
-            }}>
-              <h4 style={{ margin: 0, color: "#333", fontSize: "0.95em" }}>👁️ Seen by {seenByViewers.length}</h4>
-              <button
-                onClick={() => setSeenByViewers(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2em", color: "#999", lineHeight: 1 }}
-              >✕</button>
-            </div>
-            <div style={{ overflowY: "auto", maxHeight: "320px", padding: "8px 0" }}>
-              {seenByViewers.length === 0 ? (
-                <div style={{ padding: "20px", color: "#888", textAlign: "center", fontSize: "0.9em" }}>
-                  No one has seen this message yet
-                </div>
-              ) : (
-                seenByViewers.map((v) => (
-                  <div key={v._id} style={{
-                    padding: "10px 18px", display: "flex", alignItems: "center", gap: "10px",
-                    borderBottom: "1px solid #f5f5f5"
-                  }}>
-                    <div style={{
-                      width: "32px", height: "32px", borderRadius: "50%",
-                      backgroundColor: "#e0e7ff", display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: "0.8em", fontWeight: "bold", color: "#4f46e5"
-                    }}>
-                      {(v.anonymousName || "?")[0].toUpperCase()}
+      {/* ─── Seen By Modal ─── */}
+      {seenByViewers !== null && createPortal(
+        <div className="modal-overlay" onClick={() => setSeenByViewers(null)}>
+          <div className="modal-backdrop" />
+          <div className="modal-card" style={{ width: 320 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-inner">
+              <div className="modal-header-row">
+                <div className="modal-title">👁️ Seen by {seenByViewers.length}</div>
+                <button className="modal-close-btn" onClick={() => setSeenByViewers(null)}>✕</button>
+              </div>
+              <div className="modal-thread">
+                {seenByViewers.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-3)", fontSize: "10.5px" }}>No one has seen this message yet</div>
+                ) : (
+                  seenByViewers.map((v) => (
+                    <div key={v._id} style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: 9, borderBottom: "1px solid var(--border)" }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 9, display: "grid", placeItems: "center",
+                        background: "var(--primary-soft)", fontSize: "9px", fontWeight: 800, color: "var(--primary)"
+                      }}>
+                        {(v.anonymousName || "?")[0].toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: 600 }}>{v.anonymousName || "Unknown"}</span>
                     </div>
-                    <span style={{ fontSize: "0.9em", fontWeight: "500", color: "#333" }}>
-                      {v.anonymousName || "Unknown"}
-                    </span>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
 }
-
-const menuBtnStyle = {
-  display: "block", width: "100%", textAlign: "left", padding: "10px 14px",
-  background: "none", border: "none", cursor: "pointer", fontSize: "0.9em",
-  borderBottom: "1px solid #f0f0f0", transition: "background-color 0.15s ease",
-  color: "#333"
-};
-
-const editBtnStyle = {
-  padding: "4px 12px", fontSize: "0.8em", cursor: "pointer",
-  border: "none", borderRadius: "4px", color: "white", backgroundColor: "#007bff",
-};
