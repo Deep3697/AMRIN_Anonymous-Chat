@@ -24,6 +24,7 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
   const [editText, setEditText] = useState("");
   const [showUserPopup, setShowUserPopup] = useState(false);
   const [userPopupPos, setUserPopupPos] = useState({ x: 0, y: 0 });
+  const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   const [modalConfig, setModalConfig] = useState(null);
   const [modalInput, setModalInput] = useState("");
@@ -361,10 +362,25 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
           {message.attachment && (
             <div className="msg-attachment">
               {message.attachment.type === "image" && (
-                <img src={message.attachment.url} alt="Attachment" />
+                <img 
+                  src={message.attachment.url} 
+                  alt="Attachment" 
+                  style={{ cursor: "zoom-in" }}
+                  onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ url: message.attachment.url, type: 'image' }); }}
+                />
               )}
               {message.attachment.type === "video" && (
-                <video src={message.attachment.url} controls />
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  <video src={message.attachment.url} controls />
+                  <button 
+                    type="button"
+                    title="Fullscreen"
+                    onClick={(e) => { e.stopPropagation(); setFullscreenMedia({ url: message.attachment.url, type: 'video' }); }}
+                    style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontSize: 12, zIndex: 10 }}
+                  >
+                    ⛶
+                  </button>
+                </div>
               )}
               {message.attachment.type === "audio" && (
                 <audio src={message.attachment.url} controls style={{ display: "block", marginTop: 4 }} />
@@ -548,6 +564,41 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
               </div>
             </div>
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─── Fullscreen Media Modal ─── */}
+      {fullscreenMedia && createPortal(
+        <div 
+          className="modal-overlay" 
+          style={{ backgroundColor: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", cursor: "zoom-out" }} 
+          onClick={(e) => { e.stopPropagation(); setFullscreenMedia(null); }}
+        >
+          {fullscreenMedia.type === 'image' ? (
+            <img 
+              src={fullscreenMedia.url} 
+              alt="Fullscreen Attachment" 
+              style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: "8px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }} 
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <video 
+              src={fullscreenMedia.url} 
+              controls
+              autoPlay
+              style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: "8px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }} 
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+          <button 
+            type="button"
+            className="modal-close-btn" 
+            style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(0,0,0,0.5)", color: "white", width: "40px", height: "40px", borderRadius: "50%", fontSize: "20px", border: "none", cursor: "pointer", display: "grid", placeItems: "center" }}
+            onClick={(e) => { e.stopPropagation(); setFullscreenMedia(null); }}
+          >
+            ✕
+          </button>
         </div>,
         document.body
       )}

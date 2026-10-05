@@ -90,3 +90,9 @@ svg {
   background: rgba(27, 107, 138, 0.16);
   color: inherit;
 }
+
+/* Hide native Edge/IE password reveal button */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
