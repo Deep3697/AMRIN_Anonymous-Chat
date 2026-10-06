@@ -238,7 +238,14 @@ export async function forgotPasswordVerifyOtp(req, res) {
       return res.status(400).json({ error: result.reason });
     }
 
-    return res.status(200).json({ message: "Code verified" });
+    // Issue a short-lived token that authorises the password reset
+    const resetToken = jwt.sign(
+      { email: email.toLowerCase(), purpose: "reset" },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "10m" }
+    );
+
+    return res.status(200).json({ message: "Code verified", resetToken });
   } catch (err) {
     console.error("forgotPasswordVerifyOtp error:", err);
     return res.status(500).json({ error: "Something went wrong" });
@@ -248,19 +255,25 @@ export async function forgotPasswordVerifyOtp(req, res) {
 // ─── Forgot Password — Step 3: Reset Password ────────────────────────────
 export async function forgotPasswordReset(req, res) {
   try {
-    const { email, code, newPassword } = req.body;
-    if (!email || !code || !newPassword) {
-      return res.status(400).json({ error: "Email, code and new password are required" });
+    const { email, resetToken, newPassword } = req.body;
+    if (!email || !resetToken || !newPassword) {
+      return res.status(400).json({ error: "Email, reset token and new password are required" });
     }
 
     if (newPassword.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
 
-    // Re-verify the OTP to prevent skipping step 2
-    const result = await verifyOtp(email.toLowerCase(), code, "reset");
-    if (!result.valid) {
-      return res.status(400).json({ error: "Invalid or expired reset code" });
+    // Verify the reset token issued in step 2
+    let payload;
+    try {
+      payload = jwt.verify(resetToken, process.env.ACCESS_TOKEN_SECRET);
+    } catch {
+      return res.status(401).json({ error: "Reset session expired, please verify OTP again" });
+    }
+
+    if (payload.purpose !== "reset" || payload.email !== email.toLowerCase()) {
+      return res.status(401).json({ error: "Invalid reset token" });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });

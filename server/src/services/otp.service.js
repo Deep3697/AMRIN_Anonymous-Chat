@@ -3,6 +3,10 @@ import { Otp } from "../models/otp.model.js";
 import { sendEmail } from "../config/mail.js";
 
 export async function generateOtp(email, purpose = "register") {
+  // Remove all previous OTP records for this email+purpose
+  // so verifyOtp always finds the freshest code
+  await Otp.deleteMany({ email, purpose });
+
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const codeHash = await bcrypt.hash(code, 10);
 
@@ -25,16 +29,33 @@ export async function generateOtp(email, purpose = "register") {
 }
 
 export async function verifyOtp(email, code, purpose = "register") {
-  const record = await Otp.findOne({ email, purpose }).sort({ createdAt: -1 });
-  if (!record) return { valid: false, reason: "No OTP found" };
-  if (record.expiresAt < new Date()) return { valid: false, reason: "Expired" };
-  if (record.attempts >= 5) return { valid: false, reason: "Too many attempts" };
+  // Ensure code is always a string (guards against numeric JSON parsing)
+  const codeStr = String(code).trim();
 
-  const match = await bcrypt.compare(code, record.codeHash);
+  const record = await Otp.findOne({ email, purpose }).sort({ createdAt: -1 });
+
+  if (!record) {
+    console.warn(`[OTP] No record found for ${email} / ${purpose}`);
+    return { valid: false, reason: "No OTP found" };
+  }
+  if (record.expiresAt < new Date()) {
+    console.warn(`[OTP] Expired for ${email}`);
+    return { valid: false, reason: "Expired" };
+  }
+  if (record.attempts >= 5) {
+    return { valid: false, reason: "Too many attempts" };
+  }
+
+  const match = await bcrypt.compare(codeStr, record.codeHash);
   if (!match) {
     record.attempts += 1;
     await record.save();
+    console.warn(`[OTP] Incorrect code for ${email} (attempt ${record.attempts})`);
     return { valid: false, reason: "Incorrect code" };
   }
+
+  // Clean up — delete the used OTP so it can't be replayed
+  await Otp.deleteMany({ email, purpose });
+
   return { valid: true };
 }

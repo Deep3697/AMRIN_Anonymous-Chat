@@ -16,8 +16,8 @@ const forgotPasswordRequest = (email) =>
   axiosClient.post("/auth/forgot-password", { email });
 const forgotPasswordVerifyOtp = (email, code) =>
   axiosClient.post("/auth/forgot-password/verify-otp", { email, code });
-const forgotPasswordReset = (email, code, newPassword) =>
-  axiosClient.post("/auth/forgot-password/reset", { email, code, newPassword });
+const forgotPasswordReset = (email, resetToken, newPassword) =>
+  axiosClient.post("/auth/forgot-password/reset", { email, resetToken, newPassword });
 
 const RESEND_COOLDOWN = 30;
 
@@ -119,8 +119,8 @@ function StepOtp({ email, onNext, onBack }) {
     if (code.length < 6) { setError("Please enter the full 6-digit code."); return; }
     setError(""); setIsLoading(true);
     try {
-      await forgotPasswordVerifyOtp(email, code);
-      onNext(code);
+      const res = await forgotPasswordVerifyOtp(email, code);
+      onNext(res.data.resetToken);
     } catch (err) {
       setError(err.response?.data?.error || "Invalid or expired code.");
     } finally { setIsLoading(false); }
@@ -182,7 +182,7 @@ function StepOtp({ email, onNext, onBack }) {
 }
 
 // STEP 3 - New Password
-function StepNewPassword({ email, otp, onDone }) {
+function StepNewPassword({ email, resetToken, onDone }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -209,7 +209,7 @@ function StepNewPassword({ email, otp, onDone }) {
     if (password !== confirm) { setError("Passwords do not match."); return; }
     setError(""); setIsLoading(true);
     try {
-      await forgotPasswordReset(email, otp, password);
+      await forgotPasswordReset(email, resetToken, password);
       onDone();
     } catch (err) {
       setError(err.response?.data?.error || "Failed to reset password.");
@@ -289,7 +289,7 @@ const STEP_LABELS = ["Email", "Verify", "Reset"];
 export default function ForgotPasswordForm() {
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState("");
-  const [verifiedOtp, setVerifiedOtp] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [logoTyped, setLogoTyped] = useState(false);
 
   const mouseX = useMotionValue(0);
@@ -362,8 +362,8 @@ export default function ForgotPasswordForm() {
 
             <AnimatePresence mode="wait">
               {step === 0 && <StepEmail key="email" onNext={(em) => { setEmail(em); setStep(1); }} />}
-              {step === 1 && <StepOtp key="otp" email={email} onNext={(code) => { setVerifiedOtp(code); setStep(2); }} onBack={() => setStep(0)} />}
-              {step === 2 && <StepNewPassword key="newpwd" email={email} otp={verifiedOtp} onDone={() => setStep(3)} />}
+              {step === 1 && <StepOtp key="otp" email={email} onNext={(token) => { setResetToken(token); setStep(2); }} onBack={() => setStep(0)} />}
+              {step === 2 && <StepNewPassword key="newpwd" email={email} resetToken={resetToken} onDone={() => setStep(3)} />}
               {step === 3 && <StepSuccess key="success" />}
             </AnimatePresence>
 
