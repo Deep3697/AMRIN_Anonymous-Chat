@@ -45,9 +45,11 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      await loginUser(identifier, password);
-      const res = await fetchSession();
-      setUser(res.data.user);
+      // loginUser already returns the user AND sets auth cookies in the same response.
+      // Calling fetchSession() immediately after causes a cross-origin 401 on Render
+      // because the browser hasn't attached the newly-set cookie to the follow-up request.
+      const result = await loginUser(identifier, password);
+      setUser(result.data.user);
       navigate("/chat");
     } catch (err) {
       setError(err.response?.data?.error || "Login failed");

@@ -5,7 +5,12 @@ import './index.css'
 import App from './App.jsx'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30000 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 30000,
+      retry: false, // axios interceptor handles 401 refresh + retry — no need for RQ retries
+    },
+  },
 })
 
 createRoot(document.getElementById('root')).render(

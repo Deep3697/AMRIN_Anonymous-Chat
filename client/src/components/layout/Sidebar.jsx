@@ -302,7 +302,10 @@ export default function Sidebar() {
                   <div
                     key={g._id}
                     className={`conv-row ${isSelected ? "conv-row--active" : ""} ${hasUnread ? "conv-row--unread" : ""}`}
-                    onClick={() => setActiveGroupId(g._id, "group", g.name)}
+                    onClick={() => {
+                      setActiveGroupId(g._id, "group", g.name);
+                      window.dispatchEvent(new Event("open-mobile-chat"));
+                    }}
                     style={{ animationDelay: `${idx * 35}ms` }}
                   >
                     <span className="conv-signal-mark conv-signal-mark--group" />
@@ -339,6 +342,7 @@ export default function Sidebar() {
                     className={`conv-row ${isSelected ? "conv-row--active" : ""} ${hasUnread ? "conv-row--unread" : ""}`}
                     onClick={() => {
                       setActiveGroupId(c._id, "dm", title);
+                      window.dispatchEvent(new Event("open-mobile-chat"));
                       setUnreadCounts((prev) => ({ ...prev, [c._id]: 0 }));
                       axiosClient.patch(`/conversations/${c._id}/read`).catch((err) => console.error("Sidebar fetch failed:", err));
                     }}

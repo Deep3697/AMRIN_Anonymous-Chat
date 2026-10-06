@@ -96,7 +96,13 @@ export default function ChatPage() {
   }, [theme]);
 
   useEffect(() => {
-    if (activeGroupId && window.innerWidth <= 767) setMobileChat(true);
+    if (activeGroupId && window.innerWidth <= 768) setMobileChat(true);
+
+    const handleOpenMobile = () => {
+      if (window.innerWidth <= 768) setMobileChat(true);
+    };
+    window.addEventListener("open-mobile-chat", handleOpenMobile);
+    return () => window.removeEventListener("open-mobile-chat", handleOpenMobile);
   }, [activeGroupId]);
 
   // Close user dropdown on outside click
@@ -159,7 +165,7 @@ export default function ChatPage() {
         : "Member";
 
   return (
-    <div className="chat-app">
+    <div className={`chat-app ${mobileChat ? "chat-app--mobile-chat-open" : ""}`}>
 
       {/* ═══ BAR 2 — Brand Strip (AMRIN.CHAT logo, status, theme + user) ═══ */}
       <header className="topbar-2">

@@ -39,15 +39,34 @@ function OtpBoxes({ value, onChange, length = 6 }) {
   const digits = value.split("").concat(Array(length - value.length).fill(""));
 
   const handleChange = (index, char) => {
-    if (!/^\d?$/.test(char)) return; // only allow digits
+    const cleaned = String(char).replace(/\D/g, "");
+    if (!cleaned) {
+      const newDigits = [...digits];
+      newDigits[index] = "";
+      onChange(newDigits.join(""));
+      return;
+    }
+
+    if (cleaned.length > 1) {
+      // Multiple digits entered (e.g. mobile autofill or keyboard suggestion)
+      const newDigits = [...digits];
+      for (let j = 0; j < cleaned.length && index + j < length; j++) {
+        newDigits[index + j] = cleaned[j];
+      }
+      const newValue = newDigits.join("").slice(0, length);
+      onChange(newValue);
+      const nextIdx = Math.min(index + cleaned.length, length - 1);
+      inputRefs.current[nextIdx]?.focus();
+      return;
+    }
 
     const newDigits = [...digits];
-    newDigits[index] = char;
+    newDigits[index] = cleaned;
     const newValue = newDigits.join("").slice(0, length);
     onChange(newValue);
 
     // Auto-advance to next box
-    if (char && index < length - 1) {
+    if (cleaned && index < length - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -68,13 +87,12 @@ function OtpBoxes({ value, onChange, length = 6 }) {
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
     onChange(pasted);
-    // Focus last filled box or the next empty one
     const focusIndex = Math.min(pasted.length, length - 1);
     inputRefs.current[focusIndex]?.focus();
   };
 
   return (
-    <div className="auth-otp-boxes">
+    <div className="auth-otp-boxes" onPaste={handlePaste}>
       {digits.slice(0, length).map((d, i) => (
         <motion.input
           key={i}
@@ -86,7 +104,7 @@ function OtpBoxes({ value, onChange, length = 6 }) {
           value={d}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          onPaste={i === 0 ? handlePaste : undefined}
+          onPaste={handlePaste}
           autoFocus={i === 0}
           whileFocus={{ scale: 1.04 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -284,9 +302,12 @@ export default function RegisterForm() {
     setError("");
     setIsLoading(true);
     try {
-      await completeProfile({ signupToken, anonymousName, gender, password });
-      const res = await fetchSession();
-      setUser(res.data.user);
+      // completeProfile already returns the user AND sets the auth cookies in the
+      // same response — no need to call fetchSession() again. Doing so on
+      // cross-origin (Render) causes a 401 because the browser hasn't attached
+      // the newly-set cookie to the follow-up request yet.
+      const result = await completeProfile({ signupToken, anonymousName, gender, password });
+      setUser(result.data.user);
       navigate("/chat");
     } catch (err) {
       setError(err.response?.data?.error || "Something went wrong");

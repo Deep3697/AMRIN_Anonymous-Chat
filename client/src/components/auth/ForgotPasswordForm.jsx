@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   motion,
@@ -89,16 +89,34 @@ function StepOtp({ email, onNext, onBack }) {
   const inputRefs = useRef([]);
 
   // Countdown
-  useState(() => {
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
     const interval = setInterval(() => {
-      setResendCooldown((prev) => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
+      setResendCooldown((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(interval);
-  });
+  }, [resendCooldown]);
 
   function handleChange(idx, val) {
-    const cleaned = val.replace(/\D/g, "").slice(-1);
-    const next = [...otp]; next[idx] = cleaned; setOtp(next);
+    const cleaned = val.replace(/\D/g, "");
+    if (!cleaned) {
+      const next = [...otp];
+      next[idx] = "";
+      setOtp(next);
+      return;
+    }
+    if (cleaned.length > 1) {
+      const next = [...otp];
+      for (let j = 0; j < cleaned.length && idx + j < 6; j++) {
+        next[idx + j] = cleaned[j];
+      }
+      setOtp(next);
+      inputRefs.current[Math.min(idx + cleaned.length, 5)]?.focus();
+      return;
+    }
+    const next = [...otp];
+    next[idx] = cleaned;
+    setOtp(next);
     if (cleaned && idx < 5) inputRefs.current[idx + 1]?.focus();
   }
   function handleKeyDown(idx, e) {

@@ -61,10 +61,11 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     document.dispatchEvent(new Event("close-all-context-menus"));
 
     // Position fixed to the viewport to avoid clipping by overflow:hidden containers
+    const safeTop = Math.min(e.clientY, window.innerHeight - 220);
     if (isOwnMessage) {
-      setContextPos({ top: e.clientY, right: window.innerWidth - e.clientX, left: null });
+      setContextPos({ top: safeTop, right: Math.max(10, window.innerWidth - e.clientX), left: null });
     } else {
-      setContextPos({ top: e.clientY, left: e.clientX, right: null });
+      setContextPos({ top: safeTop, left: Math.min(e.clientX, window.innerWidth - 200), right: null });
     }
 
     // Small delay to let close event propagate before opening this menu
@@ -223,7 +224,10 @@ export default function MessageBubble({ message, isOwnMessage, userRole, threadT
     document.dispatchEvent(new Event("close-all-context-menus"));
     setTimeout(() => {
       setShowUserPopup(true);
-      setUserPopupPos({ x: e.clientX, y: e.clientY });
+      setUserPopupPos({
+        x: Math.min(e.clientX, window.innerWidth - 200),
+        y: Math.min(e.clientY, window.innerHeight - 180),
+      });
     }, 0);
   }
 

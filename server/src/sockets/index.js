@@ -6,14 +6,39 @@ import { Membership } from "../models/membership.model.js";
 import { Conversation } from "../models/conversation.model.js";
 
 export function initSocket(io) {
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
         try {
             const rawCookie = socket.handshake.headers.cookie || "";
             const parseFn = cookie.parseCookie || cookie.parse;
             const cookies = parseFn ? parseFn(rawCookie) : {};
-            const token = cookies.accessToken;
-            if (!token) return next(new Error("Not authenticated"));
-            socket.user = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+            let userPayload = null;
+
+            if (cookies.accessToken) {
+                try {
+                    userPayload = jwt.verify(cookies.accessToken, process.env.ACCESS_TOKEN_SECRET);
+                } catch {
+                    // Access token expired, attempt refresh token fallback below
+                }
+            }
+
+            if (!userPayload && cookies.refreshToken) {
+                try {
+                    const refreshPayload = jwt.verify(cookies.refreshToken, process.env.REFRESH_TOKEN_SECRET);
+                    const { User } = await import("../models/user.model.js");
+                    const dbUser = await User.findById(refreshPayload.sub);
+                    if (dbUser) {
+                        userPayload = { sub: dbUser._id, role: dbUser.role };
+                    }
+                } catch {
+                    // Refresh token invalid or expired
+                }
+            }
+
+            if (!userPayload) {
+                return next(new Error("Not authenticated"));
+            }
+
+            socket.user = userPayload;
             next();
         } catch (err) {
             console.error("Socket authentication error:", err.message);

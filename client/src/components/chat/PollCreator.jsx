@@ -19,7 +19,7 @@ export default function PollCreator({ threadId, threadType, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-backdrop" />
-      <div className="modal-card" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" style={{ width: "min(380px, calc(100vw - 24px))" }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-inner">
           <div className="modal-header-row">
             <div className="modal-title">📊 Create Poll</div>

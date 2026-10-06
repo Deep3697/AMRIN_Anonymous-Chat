@@ -4,7 +4,7 @@ dns.setServers(["8.8.8.8", "1.1.1.1"]); // Force Node to use Google/Cloudflare D
 import "dotenv/config";
 import http from "http";
 import { Server } from "socket.io";
-import { app } from "./app.js";
+import { app, corsOriginChecker } from "./app.js";
 import connectDB from "./db/index.js";
 import { initSocket } from "./sockets/index.js";
 import { setIO } from "./utils/socketIO.js";
@@ -14,16 +14,9 @@ import { startBanExpiryJob } from "./jobs/banExpiry.job.js";
 const PORT = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : null,
-  "https://amrin-anonymous-chat.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000",
-].filter(Boolean);
-
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginChecker,
     credentials: true,
   },
 });

@@ -190,10 +190,11 @@ export async function session(req, res) {
 }
 
 export function logout(req, res) {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.RENDER === "true" || !!process.env.RENDER;
   const cookieOpts = {
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
   };
   res.clearCookie("accessToken", cookieOpts);
   res.clearCookie("refreshToken", cookieOpts);

@@ -434,6 +434,13 @@ export default function ChatWindow({ onMobileBack }) {
               className="composer-input"
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onFocus={() => {
+                setTimeout(() => {
+                  if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                  }
+                }, 200);
+              }}
               placeholder="Type a message…"
               disabled={isUploading}
             />

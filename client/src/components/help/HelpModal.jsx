@@ -32,7 +32,7 @@ export default function HelpModal({ onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-backdrop" />
-      <div className="modal-card" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" style={{ width: "min(440px, calc(100vw - 24px))" }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-inner">
           <div className="modal-header-row">
             <div className="modal-title">📩 Contact Admin</div>

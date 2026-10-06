@@ -36,7 +36,7 @@ export default function BanAppealModal() {
 
   return (
     <div className="chat-app" style={{ display: "grid", placeItems: "center" }}>
-      <div className="modal-card" style={{ width: 480, animation: "modalOpenClean 460ms var(--spring) both" }}>
+      <div className="modal-card" style={{ width: "min(480px, calc(100vw - 24px))", animation: "modalOpenClean 460ms var(--spring) both" }}>
         <div className="modal-inner">
           <div className="modal-title" style={{ color: "var(--danger)" }}>🚫 You Have Been Banned</div>
           <p className="modal-subtitle">

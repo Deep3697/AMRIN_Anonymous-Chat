@@ -18,6 +18,13 @@ export async function uploadMedia(file) {
     `https://api.cloudinary.com/v1_1/wwebz56i/auto/upload`,
     { method: "POST", body: formData }
   );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Failed to upload file to Cloudinary");
+  }
   const data = await res.json();
+  if (!data.secure_url) {
+    throw new Error(data.error?.message || "Upload failed: no secure URL returned");
+  }
   return { url: data.secure_url, publicId: data.public_id };
 }

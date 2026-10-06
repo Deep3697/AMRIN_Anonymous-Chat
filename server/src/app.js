@@ -18,13 +18,31 @@ import adminStatsRoutes from "./routes/adminStats.routes.js";
 
 
 const app = express();
+app.set("trust proxy", 1);
+
+const staticOrigins = [
+  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/+$/, "") : null,
+  "https://amrin-anonymous-chat.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+].filter(Boolean);
+
+export const corsOriginChecker = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  const clean = origin.replace(/\/+$/, "");
+  if (
+    staticOrigins.includes(clean) ||
+    clean.endsWith(".vercel.app") ||
+    /^https?:\/\/localhost(:\d+)?$/.test(clean)
+  ) {
+    return callback(null, true);
+  }
+  return callback(null, false);
+};
 
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, "") : null,
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ].filter(Boolean),
+  origin: corsOriginChecker,
   credentials: true
 }));
 
