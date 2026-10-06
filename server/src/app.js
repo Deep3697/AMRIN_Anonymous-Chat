@@ -25,7 +25,7 @@ app.use(cors({
     "http://localhost:5173",
     "http://localhost:3000",
   ].filter(Boolean),
-  credentials: true  
+  credentials: true
 }));
 
 // Middlewares to parse JSON bodies and cookies
