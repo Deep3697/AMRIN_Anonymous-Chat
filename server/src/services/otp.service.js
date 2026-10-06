@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { Otp } from "../models/otp.model.js";
-import { transporter } from "../config/mail.js";
+import { sendEmail } from "../config/mail.js";
 
 export async function generateOtp(email, purpose = "register") {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -13,11 +13,12 @@ export async function generateOtp(email, purpose = "register") {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  await transporter.sendMail({
-    from: process.env.MAIL_USER,
+  console.log(`[OTP] ${purpose} code for ${email}: ${code}`);
+
+  await sendEmail({
     to: email,
-    subject: "Your verification code",
-    text: `Your OTP is ${code}. It expires in 10 minutes.`,
+    subject: "Your AMRIN Verification Code",
+    text: `Your AMRIN verification code is: ${code}\n\nThis code will expire in 10 minutes.\nIf you did not request this, please ignore this email.`,
   });
 
   return true;
