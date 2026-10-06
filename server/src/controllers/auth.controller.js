@@ -190,8 +190,13 @@ export async function session(req, res) {
 }
 
 export function logout(req, res) {
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
+  const cookieOpts = {
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+  };
+  res.clearCookie("accessToken", cookieOpts);
+  res.clearCookie("refreshToken", cookieOpts);
   return res.status(200).json({ message: "Logged out" });
 }
 
